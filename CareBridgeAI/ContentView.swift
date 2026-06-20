@@ -1,55 +1,127 @@
-//
-//  ContentView.swift
-//  CareBridgeAI
-//
-//  Created by user13 on 6/19/26.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var onboardingStep = 0
+    @State private var selectedLanguage: AppLanguage = .zhTW
+
+    @State private var recipientDraft = CareRecipientDraft()
+
+    @State private var currentDraft: CareRecipientDraft?
+    @State private var currentUser: Caregiver?
+    @State private var isLoggedIn = false
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        if isLoggedIn, let currentDraft, let currentUser {
+            AppMainView(
+                draft: currentDraft,
+                currentUser: currentUser,
+                onLogout: {
+                    isLoggedIn = false
+                    self.currentDraft = nil
+                    self.currentUser = nil
+                    onboardingStep = 0
+                }
+            )
+        } else {
+            switch onboardingStep {
+            case 0:
+                LanguageSelectionView(
+                    selectedLanguage: $selectedLanguage,
+                    onNext: {
+                        onboardingStep = 1
                     }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                )
+
+            case 1:
+                WelcomeView(
+                    selectedLanguage: selectedLanguage,
+                    onCreateNewAccount: {
+                        recipientDraft = CareRecipientDraft()
+                        onboardingStep = 2
+                    },
+                    onJoinExistingAccount: {
+                        onboardingStep = 10
+                    },
+                    onLogin: {
+                        onboardingStep = 20
                     }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+                )
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+            case 2:
+                CreateRecipientView(
+                    draft: $recipientDraft,
+                    selectedLanguage: selectedLanguage,
+                    onNext: {
+                        onboardingStep = 3
+                    }
+                )
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            case 3:
+                CreateCaregiverGroupView(
+                    draft: $recipientDraft,
+                    selectedLanguage: selectedLanguage,
+                    onBack: {
+                        onboardingStep = 2
+                    },
+                    onFinish: {
+                        onboardingStep = 4
+                    }
+                )
+
+            case 4:
+                SetupCompleteView(
+                    draft: recipientDraft,
+                    selectedLanguage: selectedLanguage,
+                    onEnterHome: {
+                        CareAccountStore.shared.saveCareAccount(recipientDraft)
+
+                        if let manager = recipientDraft.caregivers.first(where: {
+                            $0.role == .mainManager && $0.status == .approved
+                        }) {
+                            CareAccountStore.shared.registerUser(
+                                caregiver: manager,
+                                careRecipientID: recipientDraft.careRecipientID
+                            )
+
+                            currentDraft = recipientDraft
+                            currentUser = manager
+                            isLoggedIn = true
+                        }
+                    }
+                )
+
+            case 10:
+                JoinExistingAccountView(
+                    selectedLanguage: selectedLanguage,
+                    presetCareRecipientID: "",
+                    onBack: {
+                        onboardingStep = 1
+                    },
+                    onFinish: {
+                        onboardingStep = 20
+                    }
+                )
+
+            case 20:
+                LoginView(
+                    selectedLanguage: selectedLanguage,
+                    onBack: {
+                        onboardingStep = 1
+                    },
+                    onLoginSuccess: { draft, user in
+                        currentDraft = draft
+                        currentUser = user
+                        isLoggedIn = true
+                    }
+                )
+
+            default:
+                LanguageSelectionView(
+                    selectedLanguage: $selectedLanguage,
+                    onNext: {
+                        onboardingStep = 1
+                    }
+                )
             }
         }
     }
@@ -57,5 +129,4 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
