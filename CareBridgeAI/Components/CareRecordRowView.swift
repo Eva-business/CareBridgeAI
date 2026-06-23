@@ -1,6 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct CareRecordRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let record: CareRecord
 
     var body: some View {
@@ -16,7 +19,7 @@ struct CareRecordRowView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(record.category.rawValue)
+                    Text(record.category.displayName(appLanguage))
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundStyle(record.category.color)
@@ -26,7 +29,7 @@ struct CareRecordRowView: View {
                         .clipShape(Capsule())
 
                     if let condition = record.condition {
-                        Text(condition.rawValue)
+                        Text(condition.displayName(appLanguage))
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundStyle(condition.color)
@@ -39,13 +42,17 @@ struct CareRecordRowView: View {
                     Spacer()
                 }
 
-                Text(record.content)
+                LocalizedDataText(text: record.content)
                     .font(.subheadline)
                     .lineSpacing(3)
 
+                if !record.attachments.isEmpty {
+                    attachmentStrip
+                }
+
                 HStack {
-                    Text(record.createdBy)
-                    Text("・")
+                    LocalizedDataText(text: record.createdBy)
+                    Text("-")
                     Text(record.createdAt.formatted(date: .numeric, time: .shortened))
                 }
                 .font(.caption)
@@ -57,12 +64,51 @@ struct CareRecordRowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(record.attachments) { attachment in
+                    attachmentThumbnail(attachment)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func attachmentThumbnail(_ attachment: CareRecordAttachment) -> some View {
+        Group {
+            if attachment.kind == .image,
+               let uiImage = UIImage(data: attachment.data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: "video.fill")
+                        .font(.title3)
+                    Text(appLanguage.text(en: "Video", zhTW: "影片"))
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                }
+                .foregroundStyle(AppTheme.primaryGreen)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.lightGreen)
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
 }
 
 #Preview {
     CareRecordRowView(
         record: CareRecord(
-            content: "早餐吃了半碗粥，喝水正常。",
+            content: "Ate half a bowl of congee for breakfast. Water intake was normal.",
             category: .food,
             condition: .good
         )

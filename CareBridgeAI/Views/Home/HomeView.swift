@@ -1,26 +1,61 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let draft: CareRecipientDraft
     let profilePhoto: ProfilePhotoStore
     let status: CareStatus
 
     let aiSummary: String
+    let summaryUsesOnDeviceModel: Bool
     @Binding var tasks: [CareTask]
     @Binding var memos: [Memo]
 
     @State private var isMemoExpanded = false
     @State private var newMemoText = ""
+    @State private var showingFullSummary = false
+
+    private var recipientDisplayName: String {
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return appLanguage.text(en: "Care Recipient", zhTW: "被照護者") }
+        return appLanguage.isChinese ? name : (name.containsCareBridgeCJKText ? "Care Recipient" : name)
+    }
+
+    private var displayedAISummary: String {
+        aiSummary.localizedCareText(appLanguage)
+    }
 
     private var nextTask: CareTask? {
         tasks
-            .filter { !$0.isDone }
-            .sorted { $0.dueDate < $1.dueDate }
+            .compactMap { task -> (task: CareTask, occurrence: Date)? in
+                guard !task.isDone,
+                      let occurrence = task.nextOccurrence()
+                else {
+                    return nil
+                }
+
+                return (task, occurrence)
+            }
+            .sorted { $0.occurrence < $1.occurrence }
+            .map(\.task)
             .first
     }
 
     private var todayTasks: [CareTask] {
-        tasks.sorted { $0.dueDate < $1.dueDate }
+        tasks
+            .filter { $0.occurs(on: Date()) }
+            .sorted {
+                let calendar = Calendar.current
+                let lhsHour = calendar.component(.hour, from: $0.dueDate)
+                let rhsHour = calendar.component(.hour, from: $1.dueDate)
+
+                if lhsHour == rhsHour {
+                    return calendar.component(.minute, from: $0.dueDate) < calendar.component(.minute, from: $1.dueDate)
+                }
+
+                return lhsHour < rhsHour
+            }
     }
 
     var body: some View {
@@ -32,8 +67,11 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         MainHeaderView(
-                            title: "首頁",
-                            subtitle: "\(draft.name.isEmpty ? "被照護者" : draft.name) 的今日狀態"
+                            title: appLanguage.text(en: "Home", zhTW: "首頁"),
+                            subtitle: appLanguage.text(
+                                en: "Today's status for \(recipientDisplayName)",
+                                zhTW: "\(recipientDisplayName) 的今日狀態"
+                            )
                         )
 
                         recipientCard
@@ -50,6 +88,40 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
+            .dismissKeyboardOnTap()
+            .sheet(isPresented: $showingFullSummary) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Label(appLanguage.text(en: "AI Handoff Summary", zhTW: "AI 交接摘要"), systemImage: "sparkles")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(AppTheme.primaryGreen)
+
+                        Label(status.displayName(appLanguage), systemImage: status.icon)
+                            .font(.headline)
+                            .foregroundStyle(status.color)
+
+                        LocalizedDataText(text: aiSummary)
+                            .font(.body)
+                            .lineSpacing(6)
+
+                        Text(summaryUsesOnDeviceModel ? appLanguage.text(en: "Apple Foundation Models - On-device", zhTW: "Apple Foundation Models - 裝置端生成") : appLanguage.text(en: "Smart fallback summary", zhTW: "智慧備援摘要"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(24)
+                    .background(AppTheme.background.ignoresSafeArea())
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(appLanguage.text(en: "Done", zhTW: "完成")) { showingFullSummary = false }
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
         }
     }
 
@@ -75,11 +147,11 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Text(draft.name.isEmpty ? "被照護者" : draft.name)
+                    Text(recipientDisplayName)
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    Text(draft.gender)
+                    Text(draft.gender.localizedProfileValue(appLanguage))
                         .font(.caption)
                         .foregroundStyle(AppTheme.primaryGreen)
                 }
@@ -98,66 +170,86 @@ struct HomeView: View {
     }
 
     private var recipientSubtitle: String {
-        let relationship = draft.relationship.isEmpty ? "家人" : draft.relationship
-        return "\(relationship)・今日照護總覽"
+        let relationship = draft.relationship.isEmpty ? appLanguage.text(en: "Family", zhTW: "家人") : draft.relationship.localizedProfileValue(appLanguage)
+        return appLanguage.text(en: "\(relationship) - Today's care overview", zhTW: "\(relationship) - 今日照護總覽")
     }
 
     private var statusAndSummaryCard: some View {
-        HStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Text("今日狀態")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
                 ZStack {
                     Circle()
                         .fill(status.color.opacity(0.16))
-                        .frame(width: 96, height: 96)
+                        .frame(width: 64, height: 64)
 
                     Image(systemName: status.icon)
-                        .font(.system(size: 48))
+                        .font(.system(size: 32))
                         .foregroundStyle(status.color)
                 }
 
-                Text(status.rawValue)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(status.color)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(appLanguage.text(en: "Today's Status", zhTW: "今日狀態"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Text(status.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(status.displayName(appLanguage))
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(status.color)
+
+                    Text(status.description(appLanguage))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
             }
-            .frame(width: 120)
 
             Divider()
 
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(AppTheme.primaryGreen)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(AppTheme.primaryGreen)
 
-                    Text("AI 交接摘要")
-                        .font(.headline)
-                        .fontWeight(.bold)
+                        Text(appLanguage.text(en: "AI Handoff Summary", zhTW: "AI 交接摘要"))
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
-                    Spacer()
+                        Spacer()
+                    }
 
-                    Text("過去 24 小時")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(summaryUsesOnDeviceModel ? appLanguage.text(en: "On-device AI", zhTW: "裝置端 AI") : appLanguage.text(en: "Smart fallback", zhTW: "智慧備援"))
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppTheme.primaryGreen)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppTheme.lightGreen)
+                            .clipShape(Capsule())
+
+                        Text(appLanguage.text(en: "Past 24 hours", zhTW: "過去 24 小時"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+                    }
                 }
 
-                Text(aiSummary)
+                LocalizedDataText(text: aiSummary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
 
                 Button {
-                    print("查看完整摘要")
+                    showingFullSummary = true
                 } label: {
                     HStack(spacing: 4) {
-                        Text("查看完整摘要")
+                        Text(appLanguage.text(en: "View full summary", zhTW: "查看完整摘要"))
                         Image(systemName: "chevron.right")
                     }
                     .font(.caption)
@@ -173,7 +265,7 @@ struct HomeView: View {
     }
 
     private var nextTaskCard: some View {
-        HomeCardView(title: "下一個任務", icon: "list.bullet.rectangle.fill") {
+        HomeCardView(title: appLanguage.text(en: "Next Task", zhTW: "下一個任務"), icon: "list.bullet.rectangle.fill") {
             if let nextTask {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(nextTask.dueDate.formatted(date: .omitted, time: .shortened))
@@ -181,16 +273,16 @@ struct HomeView: View {
                         .fontWeight(.bold)
                         .foregroundStyle(AppTheme.primaryGreen)
 
-                    Text(nextTask.title)
+                    LocalizedDataText(text: nextTask.title)
                         .font(.headline)
 
                     if !nextTask.note.isEmpty {
-                        Text(nextTask.note)
+                        LocalizedDataText(text: nextTask.note)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(nextTask.type.rawValue)
+                    Text(nextTask.type.displayName(appLanguage))
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundStyle(AppTheme.primaryGreen)
@@ -201,7 +293,7 @@ struct HomeView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Text("目前沒有待辦任務")
+                Text(appLanguage.text(en: "No pending tasks", zhTW: "目前沒有待辦任務"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -209,7 +301,7 @@ struct HomeView: View {
     }
 
     private var memoCard: some View {
-        HomeCardView(title: "個人備忘", icon: "note.text") {
+        HomeCardView(title: appLanguage.text(en: "Personal Notes", zhTW: "個人備忘"), icon: "note.text") {
             VStack(spacing: 12) {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -218,15 +310,22 @@ struct HomeView: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(memos.isEmpty ? "尚無備忘" : "\(memos.count) 則備忘")
+                            Text(memos.isEmpty ? appLanguage.text(en: "No notes yet", zhTW: "尚無備忘") : appLanguage.text(en: "\(memos.count) note(s)", zhTW: "\(memos.count) 則備忘"))
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.primary)
 
-                            Text(memos.first?.content ?? "點擊新增個人備忘")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                            if let firstMemo = memos.first {
+                                LocalizedDataText(text: firstMemo.content)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            } else {
+                                Text(appLanguage.text(en: "Tap to add a personal note", zhTW: "點擊新增個人備忘"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                         }
 
                         Spacer()
@@ -240,7 +339,7 @@ struct HomeView: View {
                 if isMemoExpanded {
                     VStack(spacing: 12) {
                         HStack {
-                            TextField("新增個人備忘", text: $newMemoText)
+                            TextField(appLanguage.text(en: "Add a personal note", zhTW: "新增個人備忘"), text: $newMemoText)
                                 .textFieldStyle(.plain)
                                 .padding()
                                 .background(AppTheme.background)
@@ -261,7 +360,7 @@ struct HomeView: View {
                         }
 
                         if memos.isEmpty {
-                            Text("目前沒有備忘，可以在上方新增。")
+                            Text(appLanguage.text(en: "No notes yet. Add one above.", zhTW: "目前沒有備忘，可以在上方新增。"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -274,7 +373,7 @@ struct HomeView: View {
                                             .font(.caption)
 
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(memo.content)
+                                            LocalizedDataText(text: memo.content)
                                                 .font(.subheadline)
 
                                             Text(memo.createdAt.formatted(date: .numeric, time: .shortened))
@@ -305,9 +404,9 @@ struct HomeView: View {
     }
 
     private var todayTimelineCard: some View {
-        HomeCardView(title: "今日行程", icon: "calendar") {
+        HomeCardView(title: appLanguage.text(en: "Today's Schedule", zhTW: "今日行程"), icon: "calendar") {
             if todayTasks.isEmpty {
-                Text("今日尚無行程")
+                Text(appLanguage.text(en: "No schedule for today", zhTW: "今日尚無行程"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -337,6 +436,8 @@ struct HomeView: View {
 }
 
 struct TimelineRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let task: CareTask
     let isLast: Bool
 
@@ -362,12 +463,12 @@ struct TimelineRowView: View {
                 .frame(width: 52, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
+                LocalizedDataText(text: task.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
 
                 if !task.note.isEmpty {
-                    Text(task.note)
+                    LocalizedDataText(text: task.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -384,13 +485,14 @@ struct TimelineRowView: View {
         draft: CareRecipientDraft(),
         profilePhoto: ProfilePhotoStore(),
         status: .good,
-        aiSummary: "今日整體狀況穩定，早餐與午餐皆有正常進食，情緒平穩。",
+        aiSummary: "Overall status is stable today. Breakfast and lunch intake were normal, and mood was calm.",
+        summaryUsesOnDeviceModel: true,
         tasks: .constant([
-            CareTask(title: "社區復健", note: "常態任務", dueDate: Date()),
-            CareTask(title: "午餐後藥物", note: "血壓藥", dueDate: Date().addingTimeInterval(7200))
+            CareTask(title: "Community rehab", note: "Routine task", dueDate: Date()),
+            CareTask(title: "Medication after lunch", note: "Blood pressure medication", dueDate: Date().addingTimeInterval(7200))
         ]),
         memos: .constant([
-            Memo(content: "晚上容易腿部抽筋，睡前記得按摩與熱敷。")
+            Memo(content: "Leg cramps happen easily at night. Remember massage and warm compress before bed.")
         ])
     )
 }

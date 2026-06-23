@@ -41,8 +41,8 @@ struct ProfileSectionView<Content: View>: View {
 }
 
 #Preview {
-    ProfileSectionView(title: "基本資料", icon: "person.text.rectangle") {
-        ProfileInfoRow(icon: "person.fill", title: "姓名", value: "王奶奶")
+    ProfileSectionView(title: "Basic Info", icon: "person.text.rectangle") {
+        ProfileInfoRow(icon: "person.fill", title: "Name", value: "Mrs. Wang")
     }
     .padding()
     .background(AppTheme.background)

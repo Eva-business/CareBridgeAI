@@ -59,6 +59,7 @@ struct JoinExistingAccountView: View {
         .onAppear {
             careRecipientID = presetCareRecipientID
         }
+        .dismissKeyboardOnTap() // 💡 套用專案內建的收鍵盤功能
     }
 
     private var formView: some View {
@@ -80,6 +81,7 @@ struct JoinExistingAccountView: View {
             }
             .padding(24)
         }
+        .scrollDismissesKeyboard(.immediately) // 支援滑動收起鍵盤
     }
 
     private var topBar: some View {

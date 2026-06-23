@@ -2,8 +2,10 @@ import SwiftUI
 
 struct TaskDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let task: CareTask
+    let onToggleCompletion: () -> Void
     let onDelete: () -> Void
 
     private var tint: Color {
@@ -22,20 +24,44 @@ struct TaskDetailView: View {
 
                         detailCard
 
+                        completionButton
+
                         deleteButton
                     }
                     .padding(24)
                 }
             }
-            .navigationTitle("任務詳情")
+            .navigationTitle(appLanguage.text(en: "Task Details", zhTW: "任務詳細資料"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("關閉") {
+                    Button(appLanguage.text(en: "Close", zhTW: "關閉")) {
                         dismiss()
                     }
                 }
             }
+        }
+    }
+
+    private var completionButton: some View {
+        Button {
+            onToggleCompletion()
+            dismiss()
+        } label: {
+            HStack {
+                Image(systemName: task.isDone ? "arrow.uturn.backward.circle.fill" : "checkmark.circle.fill")
+                Text(
+                    task.isDone
+                        ? appLanguage.text(en: "Mark as Incomplete", zhTW: "標記為未完成")
+                        : appLanguage.text(en: "Mark as Done", zhTW: "標記為完成")
+                )
+                    .fontWeight(.bold)
+            }
+            .foregroundStyle(task.isDone ? AppTheme.warningYellow : .white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(task.isDone ? Color.white : AppTheme.primaryGreen)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
     }
 
@@ -51,12 +77,12 @@ struct TaskDetailView: View {
                     .foregroundStyle(tint)
             }
 
-            Text(task.title)
+            LocalizedDataText(text: task.title)
                 .font(.title2)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
 
-            Text(task.type.rawValue)
+            Text(task.type.displayName(appLanguage))
                 .font(.caption)
                 .fontWeight(.bold)
                 .foregroundStyle(tint)
@@ -76,7 +102,9 @@ struct TaskDetailView: View {
         VStack(spacing: 14) {
             TaskDetailRow(
                 icon: "clock.fill",
-                title: task.type == .routine ? "提醒時間" : "日期與時間",
+                title: task.type == .routine
+                    ? appLanguage.text(en: "Reminder Time", zhTW: "提醒時間")
+                    : appLanguage.text(en: "Date & Time", zhTW: "日期與時間"),
                 value: task.type == .routine
                     ? task.dueDate.formatted(date: .omitted, time: .shortened)
                     : task.dueDate.formatted(date: .numeric, time: .shortened),
@@ -85,24 +113,37 @@ struct TaskDetailView: View {
             
             TaskDetailRow(
                 icon: "bell.fill",
-                title: "提醒通知",
-                value: task.type == .routine ? "已依重複星期排定通知" : "已依指定日期排定通知",
+                title: appLanguage.text(en: "Notification", zhTW: "通知"),
+                value: task.type == .routine
+                    ? appLanguage.text(en: "Scheduled by repeat weekdays", zhTW: "依重複星期排程")
+                    : appLanguage.text(en: "Scheduled for the selected date", zhTW: "依選定日期排程"),
                 tint: tint
+            )
+
+            TaskDetailRow(
+                icon: task.isDone ? "checkmark.circle.fill" : "circle",
+                title: appLanguage.text(en: "Completion Status", zhTW: "完成狀態"),
+                value: task.isDone
+                    ? appLanguage.text(en: "Done", zhTW: "已完成")
+                    : appLanguage.text(en: "Not Done", zhTW: "未完成"),
+                tint: task.isDone ? AppTheme.primaryGreen : tint
             )
 
             if task.type == .routine {
                 TaskDetailRow(
                     icon: "repeat",
-                    title: "重複星期",
-                    value: task.repeatDescription,
+                    title: appLanguage.text(en: "Repeat Weekdays", zhTW: "重複星期"),
+                    value: task.repeatDescription(appLanguage),
                     tint: tint
                 )
             }
 
             TaskDetailRow(
                 icon: "doc.text.fill",
-                title: "備註",
-                value: task.note.isEmpty ? "無備註" : task.note,
+                title: appLanguage.text(en: "Notes", zhTW: "備註"),
+                value: task.note.isEmpty
+                    ? appLanguage.text(en: "No notes", zhTW: "無備註")
+                    : task.note,
                 tint: tint
             )
         }
@@ -119,7 +160,7 @@ struct TaskDetailView: View {
         } label: {
             HStack {
                 Image(systemName: "trash.fill")
-                Text("刪除任務")
+                Text(appLanguage.text(en: "Delete Task", zhTW: "刪除任務"))
                     .fontWeight(.bold)
             }
             .foregroundStyle(.white)
@@ -131,15 +172,16 @@ struct TaskDetailView: View {
     }
 
     private var taskIcon: String {
-        if task.title.contains("藥") {
+        let normalizedTitle = task.title.careBridgeEnglishTaskDisplayValue.localizedLowercase
+        if normalizedTitle.contains("medication") || normalizedTitle.contains("medicine") {
             return "pills.fill"
-        } else if task.title.contains("血壓") || task.title.contains("量") {
+        } else if normalizedTitle.contains("blood pressure") || normalizedTitle.contains("measure") {
             return "heart.text.square.fill"
-        } else if task.title.contains("吃") || task.title.contains("飲") {
+        } else if normalizedTitle.contains("eat") || normalizedTitle.contains("drink") || normalizedTitle.contains("meal") {
             return "fork.knife"
-        } else if task.title.contains("復健") {
+        } else if normalizedTitle.contains("rehab") || normalizedTitle.contains("exercise") {
             return "figure.walk"
-        } else if task.title.contains("回診") || task.title.contains("醫") {
+        } else if normalizedTitle.contains("follow-up") || normalizedTitle.contains("doctor") || normalizedTitle.contains("clinic") {
             return "calendar.badge.clock"
         } else {
             return task.type == .routine ? "repeat" : "calendar"
@@ -166,7 +208,7 @@ struct TaskDetailRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(value)
+                LocalizedDataText(text: value)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
@@ -184,12 +226,13 @@ struct TaskDetailRow: View {
 #Preview {
     TaskDetailView(
         task: CareTask(
-            title: "早餐前吃藥",
-            note: "降血壓藥 Amlodipine 5mg",
+            title: "Take medication before breakfast",
+            note: "Amlodipine 5 mg for blood pressure",
             dueDate: Date(),
             type: .routine,
             repeatWeekdays: Weekday.allCases
         ),
+        onToggleCompletion: {},
         onDelete: {}
     )
 }

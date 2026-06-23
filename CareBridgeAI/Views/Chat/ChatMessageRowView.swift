@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ChatMessageRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let message: ChatMessage
     let currentUser: Caregiver
     let onTranslate: () -> Void
@@ -20,7 +22,7 @@ struct ChatMessageRowView: View {
                 Image(systemName: "waveform")
                     .foregroundStyle(AppTheme.primaryGreen)
 
-                Text("語音訊息")
+                Text(appLanguage.text(en: "Voice Message", zhTW: "語音訊息"))
                     .font(.subheadline)
                     .fontWeight(.bold)
 
@@ -33,7 +35,7 @@ struct ChatMessageRowView: View {
                     .foregroundStyle(.primary)
                     .lineSpacing(3)
             } else {
-                Text("尚未顯示語音轉文字內容")
+                Text(appLanguage.text(en: "Transcript is hidden", zhTW: "逐字稿已隱藏"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -49,11 +51,11 @@ struct ChatMessageRowView: View {
             VStack(alignment: isMine ? .trailing : .leading, spacing: 8) {
                 if !isMine {
                     HStack(spacing: 6) {
-                        Text(message.senderName)
+                        Text(message.senderName.containsCareBridgeCJKText && !appLanguage.isChinese ? message.senderRole.displayName(appLanguage) : message.senderName.localizedCareText(appLanguage))
                             .font(.caption)
                             .fontWeight(.bold)
 
-                        Text(message.senderRole.rawValue)
+                        Text(message.senderRole.displayName(appLanguage))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -71,7 +73,7 @@ struct ChatMessageRowView: View {
 
                     HStack(spacing: 6) {
                         Image(systemName: "globe.asia.australia.fill")
-                        Text(message.originalLanguage.displayName)
+                        Text(appLanguage.isChinese ? message.originalLanguage.displayName : message.originalLanguage.englishName)
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -83,7 +85,7 @@ struct ChatMessageRowView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 6) {
                                 Image(systemName: "translate")
-                                Text(translatedLanguage.displayName)
+                                Text(appLanguage.isChinese ? translatedLanguage.displayName : translatedLanguage.englishName)
                             }
                             .font(.caption2)
                             .foregroundStyle(AppTheme.primaryGreen)
@@ -111,7 +113,7 @@ struct ChatMessageRowView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "text.bubble")
-                                Text("顯示文字")
+                                Text(appLanguage.text(en: "Show Text", zhTW: "顯示文字"))
                             }
                             .font(.caption)
                             .fontWeight(.semibold)
@@ -125,7 +127,7 @@ struct ChatMessageRowView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "translate")
-                                Text("翻譯")
+                                Text(appLanguage.text(en: "Translate", zhTW: "翻譯"))
                             }
                             .font(.caption)
                             .fontWeight(.semibold)
@@ -154,7 +156,7 @@ struct ChatMessageRowView: View {
             isTranscriptVisible: false
         ),
         currentUser: Caregiver(
-            name: "王小明",
+            name: "Main Manager",
             phone: "0912345678",
             email: "test@example.com",
             password: "",

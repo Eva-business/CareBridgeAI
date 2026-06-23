@@ -18,14 +18,40 @@ enum RecordInputSheet: Identifiable {
 }
 
 struct RecordsView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let draft: CareRecipientDraft
     @Binding var records: [CareRecord]
+    let recordingLanguage: AppLanguage
+    let onSummaryGenerated: (CareAISummary) -> Void
 
     @State private var selectedCategory: CareRecordCategory? = nil
+    @State private var selectedDate = Date()
     @State private var activeSheet: RecordInputSheet?
+    @State private var showingAISummary = false
+    @State private var isGeneratingSummary = false
+    @State private var generatedSummary: CareAISummary?
+
+    init(
+        draft: CareRecipientDraft,
+        records: Binding<[CareRecord]>,
+        recordingLanguage: AppLanguage = .zhTW,
+        onSummaryGenerated: @escaping (CareAISummary) -> Void = { _ in }
+    ) {
+        self.draft = draft
+        _records = records
+        self.recordingLanguage = recordingLanguage
+        self.onSummaryGenerated = onSummaryGenerated
+    }
+
+    private var selectedDateRecords: [CareRecord] {
+        records
+            .filter { Calendar.current.isDate($0.createdAt, inSameDayAs: selectedDate) }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
 
     private var filteredRecords: [CareRecord] {
-        let sorted = records.sorted { $0.createdAt > $1.createdAt }
+        let sorted = selectedDateRecords
 
         guard let selectedCategory else {
             return sorted
@@ -43,8 +69,8 @@ struct RecordsView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         MainHeaderView(
-                            title: "照護紀錄",
-                            subtitle: "文字、語音與快速判斷"
+                            title: appLanguage.text(en: "Care Records", zhTW: "照護紀錄"),
+                            subtitle: appLanguage.text(en: "Text, voice, and quick status checks", zhTW: "文字、語音與快速判斷")
                         )
 
                         dateHeader
@@ -73,19 +99,58 @@ struct RecordsView: View {
                 switch sheet {
                 case .text:
                     TextRecordInputView { newRecords in
-                        records.insert(contentsOf: newRecords, at: 0)
+                        insertRecords(onSelectedDate: newRecords)
                     }
 
                 case .voice:
-                    VoiceRecordInputView { newRecords in
-                        records.insert(contentsOf: newRecords, at: 0)
+                    VoiceRecordInputView(recordingLanguage: recordingLanguage) { newRecords in
+                        insertRecords(onSelectedDate: newRecords)
                     }
 
                 case .quick:
                     QuickConditionInputView { newRecord in
-                        records.insert(newRecord, at: 0)
+                        insertRecords(onSelectedDate: [newRecord])
                     }
                 }
+            }
+            .sheet(isPresented: $showingAISummary) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Label(appLanguage.text(en: "AI Handoff Summary", zhTW: "AI 交接摘要"), systemImage: "sparkles")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(AppTheme.primaryGreen)
+
+                        if isGeneratingSummary {
+                            ProgressView(appLanguage.text(en: "Preparing today's care records...", zhTW: "正在整理今日照護紀錄..."))
+                        } else if let generatedSummary {
+                            LocalizedDataText(text: generatedSummary.text)
+                                .font(.body)
+                                .lineSpacing(6)
+
+                            Label(
+                                generatedSummary.usedOnDeviceModel ? appLanguage.text(en: "Apple Foundation Models - On-device", zhTW: "Apple Foundation Models - 裝置端生成") : appLanguage.text(en: "Smart fallback summary", zhTW: "智慧備援摘要"),
+                                systemImage: generatedSummary.usedOnDeviceModel ? "iphone.gen3" : "checkmark.shield"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(24)
+                    .background(AppTheme.background.ignoresSafeArea())
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(appLanguage.text(en: "Done", zhTW: "完成")) { showingAISummary = false }
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
+            .onChange(of: selectedDate) {
+                generatedSummary = nil
             }
         }
     }
@@ -93,7 +158,7 @@ struct RecordsView: View {
     private var dateHeader: some View {
         HStack {
             Button {
-                print("上一天")
+                changeSelectedDate(by: -1)
             } label: {
                 Image(systemName: "chevron.left")
                     .foregroundStyle(AppTheme.primaryGreen)
@@ -101,18 +166,20 @@ struct RecordsView: View {
 
             Spacer()
 
-            Text(Date().formatted(date: .long, time: .omitted))
+            Text(selectedDate.formatted(date: .long, time: .omitted))
                 .font(.headline)
                 .fontWeight(.bold)
 
             Spacer()
 
             Button {
-                print("下一天")
+                changeSelectedDate(by: 1)
             } label: {
                 Image(systemName: "chevron.right")
                     .foregroundStyle(AppTheme.primaryGreen)
             }
+            .disabled(Calendar.current.isDateInToday(selectedDate))
+            .opacity(Calendar.current.isDateInToday(selectedDate) ? 0.35 : 1)
         }
         .padding()
         .background(Color.white)
@@ -123,7 +190,7 @@ struct RecordsView: View {
     private var categoryFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                categoryIconButton(title: "全部", icon: "square.grid.2x2.fill", category: nil)
+                categoryIconButton(title: appLanguage.text(en: "All", zhTW: "全部"), icon: "square.grid.2x2.fill", category: nil)
 
                 ForEach(CareRecordCategory.allCases) { category in
                     categoryIconButton(
@@ -169,21 +236,21 @@ struct RecordsView: View {
     private func categoryShortName(_ category: CareRecordCategory) -> String {
         switch category {
         case .food:
-            return "食"
+            return CareRecordCategory.food.shortDisplayName(appLanguage)
         case .medicine:
-            return "藥"
+            return CareRecordCategory.medicine.shortDisplayName(appLanguage)
         case .bowel:
-            return "便"
+            return CareRecordCategory.bowel.shortDisplayName(appLanguage)
         case .mood:
-            return "情緒"
+            return CareRecordCategory.mood.shortDisplayName(appLanguage)
         case .custom:
-            return "其他"
+            return CareRecordCategory.custom.shortDisplayName(appLanguage)
         }
     }
 
     private var aiSummaryButton: some View {
         HStack {
-            Text("今日紀錄 \(filteredRecords.count) 筆")
+            Text(appLanguage.text(en: "\(filteredRecords.count) record(s) today", zhTW: "當日紀錄 \(filteredRecords.count) 筆"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -191,11 +258,23 @@ struct RecordsView: View {
             Spacer()
 
             Button {
-                print("AI 摘要")
+                showingAISummary = true
+                isGeneratingSummary = true
+                Task {
+                    let result = await CareAIService.summarize(
+                        selectedDateRecords,
+                        applying24HourWindow: false
+                    )
+                    generatedSummary = result
+                    if Calendar.current.isDateInToday(selectedDate) {
+                        onSummaryGenerated(result)
+                    }
+                    isGeneratingSummary = false
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
-                    Text("AI 摘要")
+                    Text(appLanguage.text(en: "AI Summary", zhTW: "AI 摘要"))
                 }
                 .font(.caption)
                 .fontWeight(.bold)
@@ -216,10 +295,10 @@ struct RecordsView: View {
                         .font(.system(size: 44))
                         .foregroundStyle(AppTheme.primaryGreen)
 
-                    Text("尚無照護紀錄")
+                    Text(appLanguage.text(en: "No care records yet", zhTW: "尚無照護紀錄"))
                         .font(.headline)
 
-                    Text("可以透過文字、語音或快速判斷新增紀錄。")
+                    Text(appLanguage.text(en: "Add records with text, voice, or quick status checks.", zhTW: "可以透過文字、語音或快速判斷新增紀錄。"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -238,20 +317,20 @@ struct RecordsView: View {
     private var quickAddPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("新增照護紀錄")
+                Text(appLanguage.text(en: "Add Care Record", zhTW: "新增照護紀錄"))
                     .font(.headline)
                     .fontWeight(.bold)
 
                 Spacer()
 
-                Text("選擇輸入方式")
+                Text(appLanguage.text(en: "Choose input method", zhTW: "選擇輸入方式"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             HStack(spacing: 12) {
                 addButton(
-                    title: "文字輸入",
+                    title: appLanguage.text(en: "Text", zhTW: "文字"),
                     icon: "pencil",
                     action: {
                         activeSheet = .text
@@ -259,7 +338,7 @@ struct RecordsView: View {
                 )
 
                 addButton(
-                    title: "語音輸入",
+                    title: appLanguage.text(en: "Voice", zhTW: "語音"),
                     icon: "mic.fill",
                     action: {
                         activeSheet = .voice
@@ -267,7 +346,7 @@ struct RecordsView: View {
                 )
 
                 addButton(
-                    title: "快速判斷",
+                    title: appLanguage.text(en: "Quick Check", zhTW: "快速判斷"),
                     icon: "lightbulb.fill",
                     action: {
                         activeSheet = .quick
@@ -304,6 +383,28 @@ struct RecordsView: View {
         }
         .buttonStyle(.plain)
     }
+
+    private func changeSelectedDate(by dayOffset: Int) {
+        guard let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: selectedDate) else { return }
+        selectedDate = min(date, Date())
+    }
+
+    private func insertRecords(onSelectedDate newRecords: [CareRecord]) {
+        let calendar = Calendar.current
+        let selectedComponents = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+
+        let datedRecords = newRecords.map { record -> CareRecord in
+            var datedRecord = record
+            let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: record.createdAt)
+            var components = selectedComponents
+            components.hour = timeComponents.hour
+            components.minute = timeComponents.minute
+            components.second = timeComponents.second
+            datedRecord.createdAt = calendar.date(from: components) ?? selectedDate
+            return datedRecord
+        }
+        records.insert(contentsOf: datedRecords, at: 0)
+    }
 }
 
 #Preview {
@@ -311,7 +412,7 @@ struct RecordsView: View {
         draft: CareRecipientDraft(),
         records: .constant([
             CareRecord(
-                content: "早餐吃了半碗粥，食慾尚可。",
+                content: "Ate half a bowl of congee for breakfast. Appetite was fair.",
                 category: .food,
                 condition: .good
             )

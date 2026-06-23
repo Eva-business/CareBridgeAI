@@ -1,13 +1,24 @@
 import SwiftUI
 
 enum TaskPageTab: String, CaseIterable, Identifiable {
-    case calendar = "日程行事曆"
-    case routine = "常態任務"
+    case calendar = "Calendar"
+    case routine = "Routine Tasks"
 
     var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .calendar:
+            return language.text(en: "Calendar", zhTW: "日程行事曆")
+        case .routine:
+            return language.text(en: "Routine Tasks", zhTW: "常態任務")
+        }
+    }
 }
 
 struct TasksView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let draft: CareRecipientDraft
     @Binding var tasks: [CareTask]
 
@@ -51,8 +62,8 @@ struct TasksView: View {
                     ScrollView {
                         VStack(spacing: 20) {
                             MainHeaderView(
-                                title: "日程任務",
-                                subtitle: "月曆查看與任務列表管理"
+                                title: appLanguage.text(en: "Schedule & Tasks", zhTW: "日程任務"),
+                                subtitle: appLanguage.text(en: "Calendar view and task management", zhTW: "月曆查看與任務列表管理")
                             )
 
                             taskTopTabs
@@ -90,6 +101,10 @@ struct TasksView: View {
             .sheet(item: $selectedTaskForDetail) { task in
                 TaskDetailView(
                     task: task,
+                    onToggleCompletion: {
+                        toggleTaskCompletion(task)
+                        selectedTaskForDetail = nil
+                    },
                     onDelete: {
                         deleteTask(task)
                         selectedTaskForDetail = nil
@@ -108,7 +123,7 @@ struct TasksView: View {
                     }
                 } label: {
                     VStack(spacing: 10) {
-                        Text(tab.rawValue)
+                        Text(tab.title(appLanguage))
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundStyle(selectedTab == tab ? AppTheme.primaryGreen : .secondary)
@@ -168,7 +183,7 @@ struct TasksView: View {
                 Button {
                     selectedDate = Date()
                 } label: {
-                    Text("今天")
+                    Text(appLanguage.text(en: "Today", zhTW: "今天"))
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundStyle(AppTheme.primaryGreen)
@@ -180,7 +195,7 @@ struct TasksView: View {
             }
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
-                ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { weekday in
+                ForEach(appLanguage.isChinese ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { weekday in
                     Text(weekday)
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -257,11 +272,11 @@ struct TasksView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(selectedDate.formatted(.dateTime.month().day().weekday(.wide))) 的行程")
+                    Text(appLanguage.text(en: "Schedule for \(selectedDate.formatted(.dateTime.month().day().weekday(.wide)))", zhTW: "\(selectedDate.formatted(.dateTime.month().day().weekday(.wide))) 的行程"))
                         .font(.headline)
                         .fontWeight(.bold)
 
-                    Text("包含常態任務與該日非常態任務")
+                    Text(appLanguage.text(en: "Includes routine tasks and one-time tasks for this day", zhTW: "包含常態任務與該日單次任務"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -273,7 +288,7 @@ struct TasksView: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus")
-                        Text("新增任務")
+                        Text(appLanguage.text(en: "Add Task", zhTW: "新增任務"))
                     }
                     .font(.caption)
                     .fontWeight(.bold)
@@ -314,10 +329,10 @@ struct TasksView: View {
                 .font(.system(size: 42))
                 .foregroundStyle(AppTheme.primaryGreen)
 
-            Text("這一天尚無任務")
+            Text(appLanguage.text(en: "No tasks for this day", zhTW: "這一天尚無任務"))
                 .font(.headline)
 
-            Text("你可以新增非常態任務，常態任務則請到任務列表管理。")
+            Text(appLanguage.text(en: "You can add a one-time task here. Manage routine tasks in the task list.", zhTW: "你可以新增單次任務，常態任務則請到任務列表管理。"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -331,18 +346,18 @@ struct TasksView: View {
     private var routineTaskListCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             taskListHeader(
-                title: "常態任務",
-                subtitle: "每天或固定時間重複執行的照護任務",
+                title: appLanguage.text(en: "Routine Tasks", zhTW: "常態任務"),
+                subtitle: appLanguage.text(en: "Care tasks repeated daily or on fixed days", zhTW: "每天或固定時間重複執行的照護任務"),
                 icon: "repeat",
                 tint: AppTheme.primaryGreen,
-                buttonTitle: "新增常態任務",
+                buttonTitle: appLanguage.text(en: "Add Routine Task", zhTW: "新增常態任務"),
                 action: {
                     showingAddRoutineTask = true
                 }
             )
 
             if routineTasks.isEmpty {
-                Text("目前沒有常態任務")
+                Text(appLanguage.text(en: "No routine tasks yet", zhTW: "目前沒有常態任務"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -357,6 +372,9 @@ struct TasksView: View {
                             tint: AppTheme.primaryGreen,
                             onTap: {
                                 selectedTaskForDetail = task
+                            },
+                            onToggleCompletion: {
+                                toggleTaskCompletion(task)
                             },
                             onDelete: {
                                 deleteTask(task)
@@ -457,9 +475,22 @@ struct TasksView: View {
         NotificationService.shared.cancelNotification(for: task)
         tasks.removeAll { $0.id == task.id }
     }
+
+    private func toggleTaskCompletion(_ task: CareTask) {
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+
+        tasks[index].isDone.toggle()
+        if tasks[index].isDone {
+            NotificationService.shared.cancelNotification(for: tasks[index])
+        } else {
+            NotificationService.shared.scheduleNotification(for: tasks[index])
+        }
+    }
 }
 
 struct CalendarScheduleRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let task: CareTask
     let onTap: () -> Void
 
@@ -489,18 +520,18 @@ struct CalendarScheduleRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(task.title)
+                    LocalizedDataText(text: task.title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
 
                     if !task.note.isEmpty {
-                        Text(task.note)
+                        LocalizedDataText(text: task.note)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(task.type == .routine ? task.repeatDescription : task.type.rawValue)
+                    Text(task.type == .routine ? task.repeatDescription(appLanguage) : task.type.displayName(appLanguage))
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundStyle(tint)
@@ -519,15 +550,16 @@ struct CalendarScheduleRowView: View {
     }
 
     private var taskIcon: String {
-        if task.title.contains("藥") {
+        let normalizedTitle = task.title.careBridgeEnglishTaskDisplayValue.localizedLowercase
+        if normalizedTitle.contains("medication") || normalizedTitle.contains("medicine") {
             return "pills.fill"
-        } else if task.title.contains("血壓") || task.title.contains("量") {
+        } else if normalizedTitle.contains("blood pressure") || normalizedTitle.contains("measure") {
             return "heart.text.square.fill"
-        } else if task.title.contains("吃") || task.title.contains("飲") {
+        } else if normalizedTitle.contains("eat") || normalizedTitle.contains("drink") || normalizedTitle.contains("meal") {
             return "fork.knife"
-        } else if task.title.contains("復健") {
+        } else if normalizedTitle.contains("rehab") || normalizedTitle.contains("exercise") {
             return "figure.walk"
-        } else if task.title.contains("回診") || task.title.contains("醫") {
+        } else if normalizedTitle.contains("follow-up") || normalizedTitle.contains("doctor") || normalizedTitle.contains("clinic") {
             return "calendar.badge.clock"
         } else {
             return task.type == .routine ? "repeat" : "calendar"
@@ -536,9 +568,12 @@ struct CalendarScheduleRowView: View {
 }
 
 struct TaskListRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let task: CareTask
     let tint: Color
     let onTap: () -> Void
+    let onToggleCompletion: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -557,18 +592,19 @@ struct TaskListRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(task.title)
+                    LocalizedDataText(text: task.title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
+                        .strikethrough(task.isDone)
 
                     if !task.note.isEmpty {
-                        Text(task.note)
+                        LocalizedDataText(text: task.note)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(task.repeatDescription)
+                    Text(task.repeatDescription(appLanguage))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -576,10 +612,21 @@ struct TaskListRowView: View {
                 Spacer()
 
                 Menu {
+                    Button {
+                        onToggleCompletion()
+                    } label: {
+                        Label(
+                            task.isDone
+                                ? appLanguage.text(en: "Mark as Incomplete", zhTW: "標記為未完成")
+                                : appLanguage.text(en: "Mark as Done", zhTW: "標記為完成"),
+                            systemImage: task.isDone ? "arrow.uturn.backward.circle" : "checkmark.circle"
+                        )
+                    }
+
                     Button(role: .destructive) {
                         onDelete()
                     } label: {
-                        Label("刪除任務", systemImage: "trash")
+                        Label(appLanguage.text(en: "Delete Task", zhTW: "刪除任務"), systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -596,15 +643,16 @@ struct TaskListRowView: View {
     }
 
     private var taskIcon: String {
-        if task.title.contains("藥") {
+        let normalizedTitle = task.title.careBridgeEnglishTaskDisplayValue.localizedLowercase
+        if normalizedTitle.contains("medication") || normalizedTitle.contains("medicine") {
             return "pills.fill"
-        } else if task.title.contains("血壓") || task.title.contains("量") {
+        } else if normalizedTitle.contains("blood pressure") || normalizedTitle.contains("measure") {
             return "heart.text.square.fill"
-        } else if task.title.contains("吃") || task.title.contains("飲") {
+        } else if normalizedTitle.contains("eat") || normalizedTitle.contains("drink") || normalizedTitle.contains("meal") {
             return "fork.knife"
-        } else if task.title.contains("復健") {
+        } else if normalizedTitle.contains("rehab") || normalizedTitle.contains("exercise") {
             return "figure.walk"
-        } else if task.title.contains("回診") || task.title.contains("醫") {
+        } else if normalizedTitle.contains("follow-up") || normalizedTitle.contains("doctor") || normalizedTitle.contains("clinic") {
             return "calendar.badge.clock"
         } else {
             return task.type == .routine ? "repeat" : "calendar"
@@ -616,9 +664,9 @@ struct TaskListRowView: View {
     TasksView(
         draft: CareRecipientDraft(),
         tasks: .constant([
-            CareTask(title: "早餐前吃藥", note: "降血壓藥 Amlodipine 5mg", dueDate: Date(), type: .routine),
-            CareTask(title: "量血壓", note: "血壓記錄", dueDate: Date(), type: .routine),
-            CareTask(title: "回診：心臟內科", note: "健檢診所 / 張醫師", dueDate: Date(), type: .temporary)
+            CareTask(title: "Take medication before breakfast", note: "Amlodipine 5 mg for blood pressure", dueDate: Date(), type: .routine),
+            CareTask(title: "Measure blood pressure", note: "Blood pressure record", dueDate: Date(), type: .routine),
+            CareTask(title: "Follow-up: Cardiology", note: "Health clinic / Dr. Chang", dueDate: Date(), type: .temporary)
         ])
     )
 }

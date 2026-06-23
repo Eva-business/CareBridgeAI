@@ -2,6 +2,8 @@ import SwiftUI
 import CoreImage.CIFilterBuiltins
 
 struct QRCodeView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let text: String
     var size: CGFloat = 180
 
@@ -23,7 +25,7 @@ struct QRCodeView: View {
                 .fill(Color.gray.opacity(0.15))
                 .frame(width: size, height: size)
                 .overlay {
-                    Text("QR Code")
+                    Text(appLanguage.text(en: "QR Code", zhTW: "邀請 QR Code"))
                         .foregroundStyle(.secondary)
                 }
         }

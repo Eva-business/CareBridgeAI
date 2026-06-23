@@ -5,6 +5,15 @@ enum CareTaskType: String, CaseIterable, Identifiable, Codable {
     case temporary = "非常態任務"
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .routine:
+            return "Routine Task"
+        case .temporary:
+            return "One-time Task"
+        }
+    }
 }
 
 enum Weekday: Int, CaseIterable, Identifiable, Codable {
@@ -19,40 +28,48 @@ enum Weekday: Int, CaseIterable, Identifiable, Codable {
     var id: Int { rawValue }
 
     var shortName: String {
+        shortName(.en)
+    }
+
+    func shortName(_ language: AppLanguage) -> String {
         switch self {
         case .sunday:
-            return "日"
+            return language.text(en: "Sun", zhTW: "日")
         case .monday:
-            return "一"
+            return language.text(en: "Mon", zhTW: "一")
         case .tuesday:
-            return "二"
+            return language.text(en: "Tue", zhTW: "二")
         case .wednesday:
-            return "三"
+            return language.text(en: "Wed", zhTW: "三")
         case .thursday:
-            return "四"
+            return language.text(en: "Thu", zhTW: "四")
         case .friday:
-            return "五"
+            return language.text(en: "Fri", zhTW: "五")
         case .saturday:
-            return "六"
+            return language.text(en: "Sat", zhTW: "六")
         }
     }
 
     var fullName: String {
+        fullName(.en)
+    }
+
+    func fullName(_ language: AppLanguage) -> String {
         switch self {
         case .sunday:
-            return "星期日"
+            return language.text(en: "Sunday", zhTW: "星期日")
         case .monday:
-            return "星期一"
+            return language.text(en: "Monday", zhTW: "星期一")
         case .tuesday:
-            return "星期二"
+            return language.text(en: "Tuesday", zhTW: "星期二")
         case .wednesday:
-            return "星期三"
+            return language.text(en: "Wednesday", zhTW: "星期三")
         case .thursday:
-            return "星期四"
+            return language.text(en: "Thursday", zhTW: "星期四")
         case .friday:
-            return "星期五"
+            return language.text(en: "Friday", zhTW: "星期五")
         case .saturday:
-            return "星期六"
+            return language.text(en: "Saturday", zhTW: "星期六")
         }
     }
 }
@@ -88,24 +105,34 @@ struct CareTask: Identifiable, Codable {
     }
 
     var repeatDescription: String {
+        repeatDescription(.en)
+    }
+
+    func repeatDescription(_ language: AppLanguage) -> String {
         guard type == .routine else {
             return dueDate.formatted(date: .numeric, time: .shortened)
         }
 
         if repeatWeekdays.isEmpty {
-            return "未設定重複日"
+            return language.text(en: "No repeat days set", zhTW: "未設定重複日")
         }
 
         if repeatWeekdays.count == 7 {
-            return "每天 \(dueDate.formatted(date: .omitted, time: .shortened))"
+            return language.text(
+                en: "Every day at \(dueDate.formatted(date: .omitted, time: .shortened))",
+                zhTW: "每天 \(dueDate.formatted(date: .omitted, time: .shortened))"
+            )
         }
 
         let days = repeatWeekdays
             .sorted { $0.rawValue < $1.rawValue }
-            .map { $0.shortName }
-            .joined(separator: "、")
+            .map { $0.shortName(language) }
+            .joined(separator: language.isChinese ? "、" : ", ")
 
-        return "每週\(days) \(dueDate.formatted(date: .omitted, time: .shortened))"
+        return language.text(
+            en: "Every \(days) at \(dueDate.formatted(date: .omitted, time: .shortened))",
+            zhTW: "每週\(days) \(dueDate.formatted(date: .omitted, time: .shortened))"
+        )
     }
 
     func occurs(on date: Date) -> Bool {
@@ -123,6 +150,45 @@ struct CareTask: Identifiable, Codable {
             }
 
             return repeatWeekdays.contains(weekday)
+        }
+    }
+
+    func nextOccurrence(after date: Date = Date()) -> Date? {
+        let calendar = Calendar.current
+
+        switch type {
+        case .temporary:
+            return dueDate >= date ? dueDate : nil
+
+        case .routine:
+            guard !repeatWeekdays.isEmpty else { return nil }
+
+            let hour = calendar.component(.hour, from: dueDate)
+            let minute = calendar.component(.minute, from: dueDate)
+
+            for dayOffset in 0..<8 {
+                guard let baseDate = calendar.date(byAdding: .day, value: dayOffset, to: date) else {
+                    continue
+                }
+
+                let weekdayNumber = calendar.component(.weekday, from: baseDate)
+                guard let weekday = Weekday(rawValue: weekdayNumber),
+                      repeatWeekdays.contains(weekday),
+                      let occurrence = calendar.date(
+                        bySettingHour: hour,
+                        minute: minute,
+                        second: 0,
+                        of: baseDate
+                      ),
+                      occurrence >= date
+                else {
+                    continue
+                }
+
+                return occurrence
+            }
+
+            return nil
         }
     }
 }

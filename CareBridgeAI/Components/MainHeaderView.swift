@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let openCareBridgeChat = Notification.Name("openCareBridgeChat")
+}
+
 struct MainHeaderView: View {
     let title: String
     let subtitle: String?
@@ -23,7 +27,7 @@ struct MainHeaderView: View {
             Spacer()
 
             Button {
-                print("聊天室")
+                NotificationCenter.default.post(name: .openCareBridgeChat, object: nil)
             } label: {
                 Image(systemName: "message.fill")
                     .font(.headline)
@@ -37,6 +41,6 @@ struct MainHeaderView: View {
 }
 
 #Preview {
-    MainHeaderView(title: "首頁", subtitle: "今日照護狀態")
+    MainHeaderView(title: "Home", subtitle: "Today's care status")
         .padding()
 }

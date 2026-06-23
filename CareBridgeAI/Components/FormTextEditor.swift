@@ -38,8 +38,8 @@ struct FormTextEditor: View {
 
 #Preview {
     FormTextEditor(
-        title: "病史",
-        placeholder: "例如：高血壓、糖尿病、心臟病等",
+        title: "Medical History",
+        placeholder: "Example: hypertension, diabetes, heart disease",
         text: .constant("")
     )
     .padding()

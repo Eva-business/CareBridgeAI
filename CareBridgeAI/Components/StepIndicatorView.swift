@@ -42,7 +42,7 @@ struct StepIndicatorView: View {
     StepIndicatorView(
         currentStep: 1,
         totalSteps: 3,
-        titles: ["基本資料", "管理者", "完成"]
+        titles: ["Basic Info", "Manager", "Complete"]
     )
     .padding()
 }

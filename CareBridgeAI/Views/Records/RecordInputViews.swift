@@ -1,16 +1,25 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct TextRecordInputView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let onSave: ([CareRecord]) -> Void
 
     @State private var inputText = ""
+    @State private var selectedMediaItems: [PhotosPickerItem] = []
+    @State private var attachments: [CareRecordAttachment] = []
+    @State private var mediaErrorMessage: String?
+    @State private var showingCameraPicker = false
+    @State private var cameraCaptureKind: CareRecordAttachmentKind = .image
     @State private var selectedCategories: Set<CareRecordCategory> = []
-
-    private var suggestedCategories: [CareRecordCategory] {
-        CareAIService.classifyCategories(inputText)
-    }
+    @State private var inferredCondition: RecordCondition?
+    @State private var inferredSuggestions: [CareAIRecordSuggestion] = []
+    @State private var isAnalyzing = false
+    @State private var usesOnDeviceModel = false
 
     var body: some View {
         NavigationStack {
@@ -27,7 +36,7 @@ struct TextRecordInputView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .overlay(alignment: .topLeading) {
                                 if inputText.isEmpty {
-                                    Text("請輸入照護內容...")
+                                    Text(appLanguage.text(en: "Enter care details...", zhTW: "輸入照護細節..."))
                                         .font(.subheadline)
                                         .foregroundStyle(.gray.opacity(0.65))
                                         .padding(.horizontal, 14)
@@ -45,63 +54,162 @@ struct TextRecordInputView: View {
                     .padding(24)
                 }
             }
-            .navigationTitle("文字輸入")
+            .dismissKeyboardOnTap()
+            .navigationTitle(appLanguage.text(en: "Text Input", zhTW: "文字輸入"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button(appLanguage.text(en: "Cancel", zhTW: "取消")) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("儲存") {
+                    Button(appLanguage.text(en: "Save", zhTW: "儲存")) {
                         saveRecords()
                     }
                     .fontWeight(.bold)
                     .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .onChange(of: inputText) {
-                autoSelectSuggestedCategories()
+            .task(id: inputText) {
+                await analyzeInput()
+            }
+            .onChange(of: selectedMediaItems) { _, newItems in
+                Task {
+                    await loadSelectedMedia(from: newItems)
+                }
+            }
+            .sheet(isPresented: $showingCameraPicker) {
+                CameraMediaPicker(captureKind: cameraCaptureKind) { attachment in
+                    attachments.append(attachment)
+                }
             }
         }
     }
 
     private var uploadImageSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("上傳照片（選填）")
+            Text(appLanguage.text(en: "Upload photo or video (optional)", zhTW: "上傳照片或影片（選填）"))
                 .font(.headline)
 
             HStack(spacing: 12) {
-                placeholderImageButton(icon: "camera.fill", title: "拍照")
-                placeholderImageButton(icon: "photo.fill", title: "從相簿選擇")
+                cameraMenu
+                mediaLibraryPicker
+            }
+
+            if !attachments.isEmpty {
+                attachmentPreviewGrid
+            }
+
+            if let mediaErrorMessage {
+                Text(mediaErrorMessage)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.dangerRed)
             }
         }
     }
 
-    private func placeholderImageButton(icon: String, title: String) -> some View {
-        Button {
-            print(title)
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                Text(title)
-                    .font(.caption)
+    private var cameraMenu: some View {
+        Menu {
+            Button {
+                cameraCaptureKind = .image
+                showingCameraPicker = true
+            } label: {
+                Label(appLanguage.text(en: "Take Photo", zhTW: "拍照"), systemImage: "camera.fill")
             }
-            .foregroundStyle(.secondary)
-            .frame(width: 110, height: 82)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            Button {
+                cameraCaptureKind = .video
+                showingCameraPicker = true
+            } label: {
+                Label(appLanguage.text(en: "Record Video", zhTW: "錄影"), systemImage: "video.fill")
+            }
+        } label: {
+            mediaActionTile(icon: "camera.fill", title: appLanguage.text(en: "Camera", zhTW: "相機"))
         }
-        .buttonStyle(.plain)
+    }
+
+    private var mediaLibraryPicker: some View {
+        PhotosPicker(
+            selection: $selectedMediaItems,
+            maxSelectionCount: 6,
+            matching: .any(of: [.images, .videos])
+        ) {
+            mediaActionTile(icon: "photo.on.rectangle.angled", title: appLanguage.text(en: "Library", zhTW: "相簿"))
+        }
+    }
+
+    private func mediaActionTile(icon: String, title: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+            Text(title)
+                .font(.caption)
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: 110, height: 82)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var attachmentPreviewGrid: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 92), spacing: 10)],
+            spacing: 10
+        ) {
+            ForEach(attachments) { attachment in
+                attachmentPreview(attachment)
+            }
+        }
+    }
+
+    private func attachmentPreview(_ attachment: CareRecordAttachment) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if attachment.kind == .image,
+                   let uiImage = UIImage(data: attachment.data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "video.fill")
+                            .font(.title2)
+                        Text(appLanguage.text(en: "Video", zhTW: "影片"))
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(AppTheme.primaryGreen)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.lightGreen)
+                }
+            }
+            .frame(height: 92)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Button {
+                attachments.removeAll { $0.id == attachment.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white, .black.opacity(0.55))
+                    .padding(5)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var categorySelectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AI 預測類別（可修改）")
+            Text(appLanguage.text(en: "AI Predicted Categories (editable)", zhTW: "AI 預測分類（可編輯）"))
                 .font(.headline)
+
+            if isAnalyzing {
+                Label(appLanguage.text(en: "Analyzing content...", zhTW: "正在分析內容..."), systemImage: "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.primaryGreen)
+            }
 
             HStack(spacing: 12) {
                 ForEach(CareRecordCategory.allCases) { category in
@@ -133,6 +241,13 @@ struct TextRecordInputView: View {
                     .font(.caption2)
                     .fontWeight(.semibold)
 
+                if let condition = predictedCondition(for: category), isSelected {
+                    Text(condition.displayName(appLanguage))
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(condition.color)
+                }
+
                 Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                     .font(.caption)
                     .foregroundStyle(isSelected ? category.color : .gray)
@@ -142,12 +257,20 @@ struct TextRecordInputView: View {
         .buttonStyle(.plain)
     }
 
+    private func predictedCondition(for category: CareRecordCategory) -> RecordCondition? {
+        inferredSuggestions.first(where: { $0.category == category })?.condition ?? inferredCondition
+    }
+
     private var aiHintSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("AI 判斷說明")
+            Text(appLanguage.text(en: "AI Analysis Notes", zhTW: "AI 分析說明"))
                 .font(.headline)
 
-            Text("系統會根據文字內容預先勾選可能類別。若內容同時包含飲食、用藥、排便或情緒，儲存時會整理成多筆紀錄。")
+            Text(
+                usesOnDeviceModel
+                    ? appLanguage.text(en: "Foundation Models analyzed this on device. You can still edit the predicted categories; saving may split the note into multiple care records by category, severity, and content.", zhTW: "Foundation Models 已在裝置端完成分析。你仍可編輯預測分類；儲存時可能依分類、嚴重度與內容拆成多筆照護紀錄。")
+                    : appLanguage.text(en: "The system automatically analyzes and preselects categories and severity. When the on-device model is unavailable, a smart fallback keeps recording available offline.", zhTW: "系統會自動分析並預選分類與嚴重度；當裝置端模型不可用時，智慧 fallback 仍可離線完成紀錄。")
+            )
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineSpacing(3)
@@ -157,49 +280,172 @@ struct TextRecordInputView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func autoSelectSuggestedCategories() {
+    private func analyzeInput() async {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmed.isEmpty {
             selectedCategories.removeAll()
+            inferredCondition = nil
+            inferredSuggestions = []
+            usesOnDeviceModel = false
             return
         }
 
-        selectedCategories = Set(suggestedCategories)
+        isAnalyzing = true
+        try? await Task.sleep(for: .milliseconds(450))
+        guard !Task.isCancelled else { return }
+
+        let analysis = await CareAIService.analyze(trimmed)
+        guard !Task.isCancelled else { return }
+        selectedCategories = Set(analysis.categories)
+        inferredCondition = analysis.condition
+        inferredSuggestions = analysis.suggestions
+        usesOnDeviceModel = analysis.usedOnDeviceModel
+        isAnalyzing = false
     }
 
     private func saveRecords() {
-        let categories = Array(selectedCategories)
-        let newRecords = CareAIService.generateRecordsFromText(
-            inputText,
-            selectedCategories: categories
-        )
+        Task {
+            let analysis = await CareAIService.analyze(inputText)
+            let categories = selectedCategories.isEmpty ? analysis.categories : Array(selectedCategories)
+            var newRecords = CareAIService.generateRecordsFromText(
+                inputText,
+                selectedCategories: categories,
+                analysis: analysis,
+                condition: analysis.condition ?? inferredCondition
+            )
+            if !attachments.isEmpty, !newRecords.isEmpty {
+                newRecords[0].attachments = attachments
+            }
+            onSave(newRecords)
+            dismiss()
+        }
+    }
 
-        onSave(newRecords)
-        dismiss()
+    private func loadSelectedMedia(from items: [PhotosPickerItem]) async {
+        mediaErrorMessage = nil
+
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                mediaErrorMessage = appLanguage.text(en: "One attachment could not be read. Please choose it again.", zhTW: "有一個附件無法讀取，請重新選擇。")
+                continue
+            }
+
+            guard let contentType = item.supportedContentTypes.first(where: {
+                $0.conforms(to: .image) || $0.conforms(to: .movie)
+            }) else {
+                mediaErrorMessage = appLanguage.text(en: "Only photo or video attachments are supported.", zhTW: "只支援照片或影片附件。")
+                continue
+            }
+
+            let kind: CareRecordAttachmentKind = contentType.conforms(to: .movie) ? .video : .image
+            let fileExtension = contentType.preferredFilenameExtension ?? (kind == .video ? "mov" : "jpg")
+            let attachment = CareRecordAttachment(
+                kind: kind,
+                data: data,
+                filename: "\(kind == .video ? "video" : "image")-\(UUID().uuidString).\(fileExtension)",
+                contentType: contentType.identifier
+            )
+            attachments.append(attachment)
+        }
+
+        selectedMediaItems = []
     }
 
     private func categoryShortName(_ category: CareRecordCategory) -> String {
-        switch category {
-        case .food:
-            return "食"
-        case .medicine:
-            return "藥"
-        case .bowel:
-            return "便"
-        case .mood:
-            return "情緒"
-        case .custom:
-            return "其他"
+        category.shortDisplayName(appLanguage)
+    }
+}
+
+private struct CameraMediaPicker: UIViewControllerRepresentable {
+    let captureKind: CareRecordAttachmentKind
+    let onCapture: (CareRecordAttachment) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .photoLibrary
+        picker.mediaTypes = [
+            captureKind == .video ? UTType.movie.identifier : UTType.image.identifier
+        ]
+        picker.videoQuality = .typeMedium
+        picker.cameraCaptureMode = captureKind == .video ? .video : .photo
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) { }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(captureKind: captureKind, onCapture: onCapture, dismiss: dismiss)
+    }
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let captureKind: CareRecordAttachmentKind
+        let onCapture: (CareRecordAttachment) -> Void
+        let dismiss: DismissAction
+
+        init(
+            captureKind: CareRecordAttachmentKind,
+            onCapture: @escaping (CareRecordAttachment) -> Void,
+            dismiss: DismissAction
+        ) {
+            self.captureKind = captureKind
+            self.onCapture = onCapture
+            self.dismiss = dismiss
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            defer { dismiss() }
+
+            if captureKind == .image,
+               let image = info[.originalImage] as? UIImage,
+               let data = image.jpegData(compressionQuality: 0.82) {
+                onCapture(
+                    CareRecordAttachment(
+                        kind: .image,
+                        data: data,
+                        filename: "camera-\(UUID().uuidString).jpg",
+                        contentType: UTType.jpeg.identifier
+                    )
+                )
+                return
+            }
+
+            if captureKind == .video,
+               let url = info[.mediaURL] as? URL,
+               let data = try? Data(contentsOf: url) {
+                onCapture(
+                    CareRecordAttachment(
+                        kind: .video,
+                        data: data,
+                        filename: "video-\(UUID().uuidString).mov",
+                        contentType: UTType.quickTimeMovie.identifier
+                    )
+                )
+            }
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
         }
     }
 }
 struct VoiceRecordInputView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
+    let recordingLanguage: AppLanguage
     let onSave: ([CareRecord]) -> Void
 
     @StateObject private var speechService = SpeechService()
+    @State private var predictedCategories: [CareRecordCategory] = []
+    @State private var predictedSuggestions: [CareAIRecordSuggestion] = []
+    @State private var isAnalyzingTranscript = false
+    @State private var transcriptUsesOnDeviceModel = false
 
     private var canSave: Bool {
         !speechService.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -234,10 +480,14 @@ struct VoiceRecordInputView: View {
                             .foregroundStyle(AppTheme.primaryGreen)
                     }
 
-                    Text(speechService.isRecording ? "正在聆聽照護內容..." : "點擊開始錄音")
+                    Text(
+                        speechService.isRecording
+                            ? appLanguage.text(en: "Listening to care details...", zhTW: "正在聆聽照護細節...")
+                            : appLanguage.text(en: "Tap to start recording", zhTW: "點一下開始錄音")
+                    )
                         .font(.headline)
 
-                    Text("語音會先轉成文字，再交給 AI 判斷類別，可能整理成一筆或多筆照護紀錄。")
+                    Text(appLanguage.text(en: "Recognizing with \(recordingLanguage.englishName). Speech is converted to text first, then AI classifies it into one or more care records.", zhTW: "使用\(recordingLanguage.displayName)辨識。語音會先轉成文字，再由 AI 分類成一筆或多筆照護紀錄。"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -259,7 +509,7 @@ struct VoiceRecordInputView: View {
                     bottomButtons
                 }
             }
-            .navigationTitle("語音輸入")
+            .navigationTitle(appLanguage.text(en: "Voice Input", zhTW: "語音輸入"))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 speechService.requestPermission()
@@ -267,16 +517,19 @@ struct VoiceRecordInputView: View {
             .onDisappear {
                 speechService.stopRecording()
             }
+            .task(id: speechService.transcript) {
+                await analyzeTranscript()
+            }
         }
     }
 
     private var transcriptSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("語音轉文字結果")
+            Text(appLanguage.text(en: "Speech-to-text Result", zhTW: "語音轉文字結果"))
                 .font(.headline)
 
             if speechService.transcript.isEmpty {
-                Text("尚未產生文字。請點擊開始錄音後口述照護內容。")
+                Text(appLanguage.text(en: "No text yet. Tap start recording and speak the care details.", zhTW: "目前沒有文字。點選開始錄音後說出照護細節。"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
@@ -286,24 +539,29 @@ struct VoiceRecordInputView: View {
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
 
-                let categories = CareAIService.classifyCategories(speechService.transcript)
-
                 HStack(spacing: 8) {
-                    Text("AI 判斷：")
+                    Text(isAnalyzingTranscript ? appLanguage.text(en: "AI analyzing:", zhTW: "AI 分析中：") : appLanguage.text(en: "AI assessment:", zhTW: "AI 評估："))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    ForEach(categories) { category in
-                        Label(category.rawValue, systemImage: category.icon)
+                    ForEach(predictedSuggestions) { suggestion in
+                        Label(
+                            "\(suggestion.category.displayName(appLanguage)) / \(suggestion.condition.displayName(appLanguage))",
+                            systemImage: suggestion.category.icon
+                        )
                             .font(.caption2)
                             .fontWeight(.bold)
-                            .foregroundStyle(category.color)
+                            .foregroundStyle(suggestion.condition.color)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(category.color.opacity(0.12))
+                            .background(suggestion.condition.color.opacity(0.12))
                             .clipShape(Capsule())
                     }
                 }
+
+                Text(transcriptUsesOnDeviceModel ? appLanguage.text(en: "Foundation Models - On-device analysis", zhTW: "Foundation Models - 裝置端分析") : appLanguage.text(en: "Smart fallback analysis", zhTW: "智慧 fallback 分析"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -319,7 +577,7 @@ struct VoiceRecordInputView: View {
                 speechService.stopRecording()
                 dismiss()
             } label: {
-                Text("取消")
+                Text(appLanguage.text(en: "Cancel", zhTW: "取消"))
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -332,10 +590,14 @@ struct VoiceRecordInputView: View {
                 if speechService.isRecording {
                     speechService.stopRecording()
                 } else {
-                    speechService.startRecording(language: .zhTW)
+                    speechService.startRecording(language: recordingLanguage)
                 }
             } label: {
-                Text(speechService.isRecording ? "停止錄音" : "開始錄音")
+                Text(
+                    speechService.isRecording
+                        ? appLanguage.text(en: "Stop Recording", zhTW: "停止錄音")
+                        : appLanguage.text(en: "Start Recording", zhTW: "開始錄音")
+                )
                     .fontWeight(.semibold)
                     .foregroundStyle(AppTheme.primaryGreen)
                     .frame(maxWidth: .infinity)
@@ -347,7 +609,7 @@ struct VoiceRecordInputView: View {
             Button {
                 saveVoiceRecords()
             } label: {
-                Text("儲存")
+                Text(appLanguage.text(en: "Save", zhTW: "儲存"))
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -367,20 +629,44 @@ struct VoiceRecordInputView: View {
         let transcript = speechService.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !transcript.isEmpty else { return }
 
-        let categories = CareAIService.classifyCategories(transcript)
+        Task {
+            let analysis = await CareAIService.analyze(transcript)
+            let newRecords = CareAIService.generateRecordsFromText(
+                transcript,
+                selectedCategories: analysis.categories,
+                analysis: analysis,
+                condition: analysis.condition
+            )
+            onSave(newRecords)
+            dismiss()
+        }
+    }
 
-        let newRecords = CareAIService.generateRecordsFromText(
-            transcript,
-            selectedCategories: categories
-        )
+    private func analyzeTranscript() async {
+        let transcript = speechService.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !transcript.isEmpty else {
+            predictedCategories = []
+            predictedSuggestions = []
+            transcriptUsesOnDeviceModel = false
+            return
+        }
 
-        onSave(newRecords)
-        dismiss()
+        isAnalyzingTranscript = true
+        try? await Task.sleep(for: .milliseconds(450))
+        guard !Task.isCancelled else { return }
+
+        let analysis = await CareAIService.analyze(transcript)
+        guard !Task.isCancelled else { return }
+        predictedCategories = analysis.categories
+        predictedSuggestions = analysis.suggestions
+        transcriptUsesOnDeviceModel = analysis.usedOnDeviceModel
+        isAnalyzingTranscript = false
     }
 }
 
 struct QuickConditionInputView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let onSave: (CareRecord) -> Void
 
@@ -398,13 +684,13 @@ struct QuickConditionInputView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        Text("請選擇照護狀況")
+                        Text(appLanguage.text(en: "Select care status", zhTW: "選擇照護狀態"))
                             .font(.headline)
 
                         conditionGrid
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("補充說明（選填）")
+                            Text(appLanguage.text(en: "Additional notes (optional)", zhTW: "補充備註（選填）"))
                                 .font(.headline)
 
                             TextEditor(text: $note)
@@ -417,17 +703,18 @@ struct QuickConditionInputView: View {
                     .padding(24)
                 }
             }
-            .navigationTitle("快速判斷")
+            .dismissKeyboardOnTap()
+            .navigationTitle(appLanguage.text(en: "Quick Check", zhTW: "快速判斷"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button(appLanguage.text(en: "Cancel", zhTW: "取消")) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("儲存") {
+                    Button(appLanguage.text(en: "Save", zhTW: "儲存")) {
                         saveQuickRecord()
                     }
                     .fontWeight(.bold)
@@ -443,7 +730,7 @@ struct QuickConditionInputView: View {
                     .frame(width: 44)
 
                 ForEach(RecordCondition.allCases) { condition in
-                    Text(condition.rawValue)
+                    Text(condition.displayName(appLanguage))
                         .font(.caption)
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
@@ -496,9 +783,15 @@ struct QuickConditionInputView: View {
 
         let content: String
         if extraNote.isEmpty {
-            content = "\(selectedCategory.rawValue)快速判斷：目前狀態\(selectedCondition.rawValue)。"
+            content = appLanguage.text(
+                en: "\(selectedCategory.displayName(appLanguage)) quick check: current status is \(selectedCondition.displayName(appLanguage)).",
+                zhTW: "\(selectedCategory.displayName(appLanguage))快速判斷：目前狀態為\(selectedCondition.displayName(appLanguage))。"
+            )
         } else {
-            content = "\(selectedCategory.rawValue)快速判斷：目前狀態\(selectedCondition.rawValue)。\(extraNote)"
+            content = appLanguage.text(
+                en: "\(selectedCategory.displayName(appLanguage)) quick check: current status is \(selectedCondition.displayName(appLanguage)). \(extraNote)",
+                zhTW: "\(selectedCategory.displayName(appLanguage))快速判斷：目前狀態為\(selectedCondition.displayName(appLanguage))。\(extraNote)"
+            )
         }
 
         let record = CareRecord(
@@ -512,18 +805,7 @@ struct QuickConditionInputView: View {
     }
 
     private func categoryShortName(_ category: CareRecordCategory) -> String {
-        switch category {
-        case .food:
-            return "食"
-        case .medicine:
-            return "藥"
-        case .bowel:
-            return "便"
-        case .mood:
-            return "情緒"
-        case .custom:
-            return "其他"
-        }
+        category.shortDisplayName(appLanguage)
     }
 }
 

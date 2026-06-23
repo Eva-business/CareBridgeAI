@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CaregiverListDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let listType: CaregiverListType
     let mainManager: Caregiver?
@@ -32,11 +33,11 @@ struct CaregiverListDetailView: View {
                     .padding(24)
                 }
             }
-            .navigationTitle(listType.rawValue)
+            .navigationTitle(listType.title(appLanguage))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("關閉") {
+                    Button(appLanguage.text(en: "Close", zhTW: "關閉")) {
                         dismiss()
                     }
                 }
@@ -51,8 +52,8 @@ struct CaregiverListDetailView: View {
             } else {
                 emptyView(
                     icon: "person.crop.circle.badge.exclamationmark",
-                    title: "尚未建立主要照護者",
-                    message: "建立照護群組的人會成為主要管理者。"
+                    title: appLanguage.text(en: "No primary caregiver yet", zhTW: "目前沒有主要照護者"),
+                    message: appLanguage.text(en: "The person who creates the care group becomes the main manager.", zhTW: "建立照護群組的人會成為主要管理者。")
                 )
             }
         }
@@ -63,8 +64,8 @@ struct CaregiverListDetailView: View {
             if sharedCaregivers.isEmpty {
                 emptyView(
                     icon: "person.2.slash.fill",
-                    title: "目前沒有共同照護者",
-                    message: "其他家人、看護或被照護者本人加入並通過審核後，會顯示在這裡。"
+                    title: appLanguage.text(en: "No shared caregivers yet", zhTW: "目前沒有共同照護者"),
+                    message: appLanguage.text(en: "Other family members, caregivers, or the care recipient will appear here after approval.", zhTW: "其他家人、看護或被照護者本人審核通過後會顯示在這裡。")
                 )
             } else {
                 ForEach(sharedCaregivers) { caregiver in
@@ -89,12 +90,12 @@ struct CaregiverListDetailView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
-                        Text(caregiver.name)
+                        Text(caregiver.name.containsCareBridgeCJKText && !appLanguage.isChinese ? caregiver.role.displayName(appLanguage) : caregiver.name.localizedCareText(appLanguage))
                             .font(.title3)
                             .fontWeight(.bold)
 
                         if caregiver.isCreator {
-                            Text("建立者")
+                            Text(appLanguage.text(en: "Creator", zhTW: "建立者"))
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .foregroundStyle(.white)
@@ -105,7 +106,7 @@ struct CaregiverListDetailView: View {
                         }
                     }
 
-                    Text(caregiver.role.rawValue)
+                    Text(caregiver.role.displayName(appLanguage))
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundStyle(roleColor(caregiver.role))
@@ -118,26 +119,26 @@ struct CaregiverListDetailView: View {
 
             caregiverInfoRow(
                 icon: "phone.fill",
-                title: "電話",
-                value: caregiver.phone.isEmpty ? "未填寫" : caregiver.phone
+                title: appLanguage.text(en: "Phone", zhTW: "電話"),
+                value: caregiver.phone.isEmpty ? appLanguage.text(en: "Not provided", zhTW: "未提供") : caregiver.phone
             )
 
             caregiverInfoRow(
                 icon: "envelope.fill",
-                title: "信箱 / 帳號",
-                value: caregiver.email.isEmpty ? "未填寫" : caregiver.email
+                title: appLanguage.text(en: "Email / Account", zhTW: "Email / 帳號"),
+                value: caregiver.email.isEmpty ? appLanguage.text(en: "Not provided", zhTW: "未提供") : caregiver.email
             )
             
             caregiverInfoRow(
                 icon: "globe.asia.australia.fill",
-                title: "使用語言",
-                value: caregiver.preferredLanguage.displayName
+                title: appLanguage.text(en: "Language", zhTW: "語言"),
+                value: appLanguage.isChinese ? caregiver.preferredLanguage.displayName : caregiver.preferredLanguage.englishName
             )
             
             caregiverInfoRow(
                 icon: "checkmark.seal.fill",
-                title: "加入狀態",
-                value: caregiver.status.rawValue
+                title: appLanguage.text(en: "Member Status", zhTW: "成員狀態"),
+                value: caregiver.status.displayName(appLanguage)
             )
         }
         .padding()
@@ -233,7 +234,7 @@ struct CaregiverListDetailView: View {
     CaregiverListDetailView(
         listType: .mainManager,
         mainManager: Caregiver(
-            name: "王小明",
+            name: "Main Manager",
             phone: "0912345678",
             email: "test@example.com",
             password: "",

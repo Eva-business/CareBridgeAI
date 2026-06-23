@@ -24,7 +24,7 @@ final class SpeechService: ObservableObject {
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             Task { @MainActor in
                 if !granted {
-                    self.errorMessage = "尚未允許麥克風權限"
+                    self.errorMessage = "Microphone permission has not been granted."
                 }
             }
         }
@@ -41,7 +41,7 @@ final class SpeechService: ObservableObject {
         )
 
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            errorMessage = "目前無法使用此語言的語音辨識"
+            errorMessage = "Speech recognition is not available for this language right now."
             return
         }
 
@@ -53,7 +53,7 @@ final class SpeechService: ObservableObject {
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
 
             guard let recognitionRequest else {
-                errorMessage = "無法建立語音辨識請求"
+                errorMessage = "Unable to create a speech recognition request."
                 return
             }
 

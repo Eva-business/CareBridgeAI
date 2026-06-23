@@ -19,7 +19,7 @@ struct ProfileInfoRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(value.isEmpty ? "未填寫" : value)
+                Text(value.isEmpty ? "Not provided" : value)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(value.isEmpty ? .secondary : .primary)
@@ -37,8 +37,8 @@ struct ProfileInfoRow: View {
 #Preview {
     ProfileInfoRow(
         icon: "person.fill",
-        title: "姓名",
-        value: "王奶奶"
+        title: "Name",
+        value: "Mrs. Wang"
     )
     .padding()
     .background(Color.white)

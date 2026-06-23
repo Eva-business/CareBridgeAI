@@ -15,6 +15,10 @@ struct FormTextField: View {
 
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
+                .submitLabel(.done)
+                .onSubmit {
+                    hideKeyboard()
+                }
                 .textFieldStyle(.plain)
                 .padding()
                 .background(Color.white)
@@ -29,8 +33,8 @@ struct FormTextField: View {
 
 #Preview {
     FormTextField(
-        title: "姓名",
-        placeholder: "請輸入姓名",
+        title: "Name",
+        placeholder: "Enter name",
         text: .constant("")
     )
     .padding()

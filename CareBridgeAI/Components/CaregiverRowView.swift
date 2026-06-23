@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CaregiverRowView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let caregiver: Caregiver
     var canRemove: Bool = false
     var onRemove: (() -> Void)? = nil
@@ -19,11 +21,11 @@ struct CaregiverRowView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(caregiver.name)
+                    Text(caregiver.name.containsCareBridgeCJKText && !appLanguage.isChinese ? caregiver.role.displayName(appLanguage) : caregiver.name.localizedCareText(appLanguage))
                         .font(.headline)
 
                     if caregiver.isCreator {
-                        Text("建立者")
+                        Text(appLanguage.text(en: "Creator", zhTW: "建立者"))
                             .font(.caption2)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
@@ -34,7 +36,7 @@ struct CaregiverRowView: View {
                     }
                 }
 
-                Text("\(caregiver.role.rawValue)・\(caregiver.status.rawValue)")
+                Text("\(caregiver.role.displayName(appLanguage)) - \(caregiver.status.displayName(appLanguage))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -92,7 +94,7 @@ struct CaregiverRowView: View {
 #Preview {
     CaregiverRowView(
         caregiver: Caregiver(
-            name: "王小明",
+            name: "Main Manager",
             phone: "0912345678",
             email: "test@example.com",
             password: "12345678",

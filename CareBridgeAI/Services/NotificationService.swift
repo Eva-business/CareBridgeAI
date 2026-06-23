@@ -11,10 +11,10 @@ final class NotificationService {
             options: [.alert, .sound, .badge]
         ) { granted, error in
             if let error {
-                print("通知權限錯誤：\(error.localizedDescription)")
+                print("Notification permission error: \(error.localizedDescription)")
             }
 
-            print("通知權限：\(granted ? "已允許" : "未允許")")
+            print("Notification permission: \(granted ? "granted" : "not granted")")
         }
     }
 
@@ -38,7 +38,19 @@ final class NotificationService {
         )
     }
 
+    func syncNotifications(for tasks: [CareTask]) {
+        for task in tasks {
+            if task.isDone || task.nextOccurrence() == nil {
+                cancelNotification(for: task)
+            } else {
+                scheduleNotification(for: task)
+            }
+        }
+    }
+
     private func scheduleTemporaryNotification(for task: CareTask) {
+        guard task.dueDate >= Date() else { return }
+
         let content = notificationContent(for: task)
 
         let components = Calendar.current.dateComponents(
@@ -59,7 +71,7 @@ final class NotificationService {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
-                print("新增非常態任務通知失敗：\(error.localizedDescription)")
+                print("Failed to add one-time task notification: \(error.localizedDescription)")
             }
         }
     }
@@ -90,7 +102,7 @@ final class NotificationService {
 
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
-                    print("新增常態任務通知失敗：\(error.localizedDescription)")
+                    print("Failed to add routine task notification: \(error.localizedDescription)")
                 }
             }
         }
@@ -98,7 +110,7 @@ final class NotificationService {
 
     private func notificationContent(for task: CareTask) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "CareBridge AI 任務提醒"
+        content.title = "CareBridge AI Task Reminder"
         content.body = task.note.isEmpty ? task.title : "\(task.title)：\(task.note)"
         content.sound = .default
         return content

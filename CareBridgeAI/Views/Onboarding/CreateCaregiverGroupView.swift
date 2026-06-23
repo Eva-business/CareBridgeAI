@@ -52,10 +52,12 @@ struct CreateCaregiverGroupView: View {
                 }
                 .padding(24)
             }
+            .scrollDismissesKeyboard(.immediately) // 💡 支援滑動收起鍵盤
         }
         .onAppear {
             loadExistingManagerToForm()
         }
+        .dismissKeyboardOnTap() // 💡 套用專案內建的收鍵盤功能
     }
 
     private var topBar: some View {
@@ -136,6 +138,7 @@ struct CreateCaregiverGroupView: View {
                         .fontWeight(.semibold)
 
                     SecureField(passwordPlaceholderText, text: $managerPassword)
+                        .submitLabel(.next)
                         .textFieldStyle(.plain)
                         .padding()
                         .background(Color.white)
@@ -152,6 +155,7 @@ struct CreateCaregiverGroupView: View {
                         .fontWeight(.semibold)
 
                     SecureField(confirmPasswordPlaceholderText, text: $confirmPassword)
+
                         .textFieldStyle(.plain)
                         .padding()
                         .background(Color.white)

@@ -7,6 +7,17 @@ enum CareStatus: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    var displayName: String {
+        switch self {
+        case .good:
+            return "Stable"
+        case .warning:
+            return "Needs Attention"
+        case .danger:
+            return "Urgent"
+        }
+    }
+
     var color: Color {
         switch self {
         case .good:
@@ -32,11 +43,11 @@ enum CareStatus: String, CaseIterable, Identifiable, Codable {
     var description: String {
         switch self {
         case .good:
-            return "目前狀態穩定"
+            return "Currently stable"
         case .warning:
-            return "有狀況需要留意"
+            return "Follow-up needed"
         case .danger:
-            return "需要立即關注"
+            return "Immediate attention needed"
         }
     }
 }

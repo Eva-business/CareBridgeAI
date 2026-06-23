@@ -2,41 +2,66 @@ import SwiftUI
 import PhotosUI
 
 enum ProfileSectionItem: String, CaseIterable, Identifiable {
-    case basic = "基本資料"
-    case medical = "醫療資訊"
-    case lifestyle = "生活習慣"
-    case cognitive = "認知與情緒狀態"
-    case carePreference = "照護需求與偏好"
-    case emergency = "緊急聯絡人"
-    case medicalUnit = "醫療單位"
-    case files = "文件與檔案"
-    case approval = "加入申請審核"
-    case invite = "邀請成員"
+    case basic = "Basic Info"
+    case medical = "Medical Info"
+    case lifestyle = "Lifestyle"
+    case cognitive = "Cognitive & Mood"
+    case carePreference = "Care Needs & Preferences"
+    case emergency = "Emergency Contacts"
+    case medicalUnit = "Medical Providers"
+    case files = "Documents & Files"
+    case approval = "Join Requests"
+    case invite = "Invite Members"
 
     var id: String { rawValue }
 
-    var subtitle: String {
+    func title(_ language: AppLanguage) -> String {
         switch self {
         case .basic:
-            return "姓名、生日、性別、聯絡方式、地址等"
+            return language.text(en: "Basic Info", zhTW: "基本資料")
         case .medical:
-            return "疾病史、用藥資訊、過敏史、手術史等"
+            return language.text(en: "Medical Info", zhTW: "醫療資訊")
         case .lifestyle:
-            return "飲食、睡眠、運動、排泄習慣等"
+            return language.text(en: "Lifestyle", zhTW: "生活習慣")
         case .cognitive:
-            return "認知狀況、情緒傾向、溝通能力等"
+            return language.text(en: "Cognitive & Mood", zhTW: "認知與情緒")
         case .carePreference:
-            return "日常協助需求、個人偏好、禁忌事項等"
+            return language.text(en: "Care Needs & Preferences", zhTW: "照護需求與偏好")
         case .emergency:
-            return "家人、親友聯絡方式"
+            return language.text(en: "Emergency Contacts", zhTW: "緊急聯絡人")
         case .medicalUnit:
-            return "醫院、診所、醫師、醫療單位聯絡方式"
+            return language.text(en: "Medical Providers", zhTW: "醫療單位")
         case .files:
-            return "醫療報告、檢查結果、其他重要文件"
+            return language.text(en: "Documents & Files", zhTW: "文件與檔案")
         case .approval:
-            return "審核其他成員的加入申請"
+            return language.text(en: "Join Requests", zhTW: "加入申請")
         case .invite:
-            return "顯示照護帳戶 ID、邀請連結與 QR Code"
+            return language.text(en: "Invite Members", zhTW: "邀請成員")
+        }
+    }
+
+    func subtitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .basic:
+            return language.text(en: "Name, birthday, gender, contact details, and address", zhTW: "姓名、生日、性別、聯絡方式與地址")
+        case .medical:
+            return language.text(en: "Medical history, medications, allergies, and surgeries", zhTW: "病史、用藥、過敏與手術紀錄")
+        case .lifestyle:
+            return language.text(en: "Diet, sleep, exercise, and toileting habits", zhTW: "飲食、睡眠、運動與如廁習慣")
+        case .cognitive:
+            return language.text(en: "Cognition, mood patterns, and communication ability", zhTW: "認知、情緒模式與溝通能力")
+        case .carePreference:
+            return language.text(en: "Daily assistance needs, preferences, and restrictions", zhTW: "日常協助需求、偏好與限制")
+        case .emergency:
+            return language.text(en: "Family and trusted contact details", zhTW: "家人與可信任聯絡人")
+        case .medicalUnit:
+            return language.text(en: "Hospitals, clinics, physicians, and provider contacts", zhTW: "醫院、診所、醫師與聯絡方式")
+        case .files:
+            return language.text(en: "Medical reports, test results, and important files", zhTW: "醫療報告、檢驗結果與重要檔案")
+        case .approval:
+            return language.text(en: "Review join requests from other members", zhTW: "審核其他成員的加入申請")
+        case .invite:
+            return language.text(en: "Show care account ID, invite link, and QR code", zhTW: "顯示照護帳號 ID、邀請連結與 QR Code")
         }
     }
 
@@ -92,13 +117,24 @@ enum ProfileSectionItem: String, CaseIterable, Identifiable {
 }
 
 enum CaregiverListType: String, Identifiable {
-    case mainManager = "主要管理者"
-    case sharedCaregivers = "共同照護者"
+    case mainManager = "Main Manager"
+    case sharedCaregivers = "Shared Caregivers"
 
     var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .mainManager:
+            return language.text(en: "Main Manager", zhTW: "主要管理者")
+        case .sharedCaregivers:
+            return language.text(en: "Shared Caregivers", zhTW: "共同照護者")
+        }
+    }
 }
 
 struct ProfileView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     @Binding var draft: CareRecipientDraft
     let currentUser: Caregiver
     @Binding var profilePhoto: ProfilePhotoStore
@@ -110,7 +146,6 @@ struct ProfileView: View {
     @State private var selectedCaregiverList: CaregiverListType?
     
     @StateObject private var accountStore = CareAccountStore.shared
-    @State private var approvedExtraMembers: [Caregiver] = []
 
     private var manager: Caregiver? {
         draft.caregivers.first {
@@ -128,12 +163,19 @@ struct ProfileView: View {
     }
     
     private var approvedMembers: [Caregiver] {
-        let original = draft.caregivers.filter { $0.status == .approved }
-        return original + approvedExtraMembers
+        draft.caregivers.filter { $0.status == .approved }
     }
 
     private var sharedCaregiverCount: Int {
         max(approvedMembers.count - 1, 0)
+    }
+
+    private var recipientDisplayName: String {
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            return appLanguage.text(en: "Care Recipient", zhTW: "被照護者")
+        }
+        return appLanguage.isChinese ? name : name.careBridgeEnglishDisplayValue
     }
 
     var body: some View {
@@ -145,8 +187,8 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         MainHeaderView(
-                            title: "被照護者檔案",
-                            subtitle: "資料中心與群組管理"
+                            title: appLanguage.text(en: "Care Recipient Profile", zhTW: "被照護者檔案"),
+                            subtitle: appLanguage.text(en: "Data center and group management", zhTW: "資料中心與群組管理")
                         )
 
                         logoutButton
@@ -197,7 +239,7 @@ struct ProfileView: View {
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                Text("登出 / 返回入口")
+                Text(appLanguage.text(en: "Log Out / Back to Entry", zhTW: "登出 / 回到入口"))
                     .fontWeight(.semibold)
 
                 Spacer()
@@ -232,12 +274,12 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        Text(draft.name.isEmpty ? "被照護者" : draft.name)
+                        Text(recipientDisplayName)
                             .font(.title)
                             .fontWeight(.bold)
 
                         if isMainManager {
-                            Text("主要管理者")
+                            Text(appLanguage.text(en: "Main Manager", zhTW: "主要管理者"))
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .foregroundStyle(AppTheme.primaryGreen)
@@ -299,8 +341,13 @@ struct ProfileView: View {
     }
     
     private var profileSubtitle: String {
-        let blood = draft.bloodType.isEmpty ? "血型未填" : "\(draft.bloodType) 型"
-        return "\(age) 歲・\(draft.gender)・\(blood)"
+        let blood = draft.bloodType.isEmpty
+            ? appLanguage.text(en: "Blood type not set", zhTW: "未設定血型")
+            : appLanguage.text(en: "Type \(draft.bloodType)", zhTW: "\(draft.bloodType) 型")
+        return appLanguage.text(
+            en: "\(age) years old - \(draft.gender.localizedProfileValue(appLanguage)) - \(blood)",
+            zhTW: "\(age) 歲 - \(draft.gender.localizedProfileValue(appLanguage)) - \(blood)"
+        )
     }
 
     private var age: Int {
@@ -314,8 +361,8 @@ struct ProfileView: View {
             } label: {
                 ProfileStatCard(
                     icon: "heart.fill",
-                    title: "主要照護者",
-                    value: manager?.name ?? "未建立",
+                    title: appLanguage.text(en: "Primary Caregiver", zhTW: "主要照護者"),
+                    value: managerDisplayName,
                     tint: .red
                 )
             }
@@ -326,8 +373,8 @@ struct ProfileView: View {
             } label: {
                 ProfileStatCard(
                     icon: "person.2.fill",
-                    title: "共同照護者",
-                    value: "\(sharedCaregiverCount) 位",
+                    title: appLanguage.text(en: "Shared Caregivers", zhTW: "共同照護者"),
+                    value: "\(sharedCaregiverCount)",
                     tint: .blue
                 )
             }
@@ -344,11 +391,11 @@ struct ProfileView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("備註")
+                Text(appLanguage.text(en: "Notes", zhTW: "備註"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(draft.carePreference.isEmpty ? "尚無特別備註" : draft.carePreference)
+                Text(draft.carePreference.isEmpty ? appLanguage.text(en: "No special notes yet", zhTW: "目前沒有特殊備註") : draft.carePreference.localizedCareText(appLanguage))
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .lineSpacing(3)
@@ -360,6 +407,13 @@ struct ProfileView: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private var managerDisplayName: String {
+        guard let manager else {
+            return appLanguage.text(en: "Not created", zhTW: "尚未建立")
+        }
+        return manager.name.containsCareBridgeCJKText && !appLanguage.isChinese ? manager.role.displayName(appLanguage) : manager.name.localizedCareText(appLanguage)
     }
     
     private var approvalShortcutRow: some View {
@@ -376,7 +430,7 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text("加入申請審核")
+                        Text(appLanguage.text(en: "Join Requests", zhTW: "加入申請"))
                             .font(.headline)
                             .fontWeight(.bold)
                             .foregroundStyle(.primary)
@@ -390,7 +444,7 @@ struct ProfileView: View {
                             .clipShape(Circle())
                     }
 
-                    Text("審核其他成員的加入申請")
+                    Text(appLanguage.text(en: "Review join requests from other members", zhTW: "審核其他成員的加入申請"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -445,7 +499,7 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(item.rawValue)
+                        Text(item.title(appLanguage))
                             .font(.headline)
                             .fontWeight(.bold)
                             .foregroundStyle(.primary)
@@ -461,7 +515,7 @@ struct ProfileView: View {
                         }
                     }
 
-                    Text(item.subtitle)
+                    Text(item.subtitle(appLanguage))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -486,7 +540,9 @@ struct ProfileView: View {
             careRecipientID: draft.careRecipientID
         )
 
-        approvedExtraMembers.append(approved)
+        if !draft.caregivers.contains(where: { $0.id == approved.id }) {
+            draft.caregivers.append(approved)
+        }
     }
 
     private func rejectMember(_ member: Caregiver) {
@@ -505,7 +561,7 @@ struct ProfileView: View {
                     profilePhoto.imageData = data
                 }
             } catch {
-                print("讀取照片失敗：\(error.localizedDescription)")
+                print("Failed to load photo: \(error.localizedDescription)")
             }
         }
     }
@@ -546,7 +602,7 @@ struct ProfileStatCard: View {
     ProfileView(
         draft: .constant(CareRecipientDraft()),
         currentUser: Caregiver(
-            name: "主要管理者",
+            name: "Main Manager",
             phone: "0912345678",
             email: "manager@example.com",
             password: "12345678",

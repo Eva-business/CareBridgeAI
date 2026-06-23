@@ -2,6 +2,7 @@ import SwiftUI
 
 struct VoiceChatInputView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let currentUser: Caregiver
     let onSend: (String) -> Void
@@ -34,7 +35,7 @@ struct VoiceChatInputView: View {
 
                     Spacer()
 
-                    PrimaryButton(title: "送出語音訊息") {
+                    PrimaryButton(title: appLanguage.text(en: "Send Voice Message", zhTW: "送出語音訊息")) {
                         sendVoiceMessage()
                     }
                     .disabled(!canSend)
@@ -42,11 +43,12 @@ struct VoiceChatInputView: View {
                 }
                 .padding(24)
             }
-            .navigationTitle("語音訊息")
+            .navigationTitle(appLanguage.text(en: "Voice Message", zhTW: "語音訊息"))
             .navigationBarTitleDisplayMode(.inline)
+            .dismissKeyboardOnTap()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("關閉") {
+                    Button(appLanguage.text(en: "Close", zhTW: "關閉")) {
                         speechService.stopRecording()
                         dismiss()
                     }
@@ -64,11 +66,11 @@ struct VoiceChatInputView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(AppTheme.primaryGreen)
 
-            Text("使用 \(currentUser.preferredLanguage.displayName) 錄音")
+            Text(appLanguage.text(en: "Recording in \(currentUser.preferredLanguage.englishName)", zhTW: "使用\(currentUser.preferredLanguage.displayName)錄音"))
                 .font(.headline)
                 .fontWeight(.bold)
 
-            Text("錄音後會先轉成原文文字，你可以確認內容後再送出。")
+            Text(appLanguage.text(en: "Speech is converted to text first. Review it before sending.", zhTW: "語音會先轉成文字，送出前可再次確認。"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -78,7 +80,7 @@ struct VoiceChatInputView: View {
 
     private var transcriptCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("語音轉文字")
+            Text(appLanguage.text(en: "Speech-to-text", zhTW: "語音轉文字"))
                 .font(.headline)
                 .fontWeight(.bold)
 
@@ -92,7 +94,7 @@ struct VoiceChatInputView: View {
                         .stroke(Color.gray.opacity(0.18), lineWidth: 1)
                 }
 
-            Text("可在送出前手動修改辨識錯誤。")
+            Text(appLanguage.text(en: "You can edit recognition errors before sending.", zhTW: "送出前可以修正辨識錯誤。"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -112,7 +114,11 @@ struct VoiceChatInputView: View {
         } label: {
             HStack {
                 Image(systemName: speechService.isRecording ? "stop.fill" : "mic.fill")
-                Text(speechService.isRecording ? "停止錄音" : "開始錄音")
+                Text(
+                    speechService.isRecording
+                        ? appLanguage.text(en: "Stop Recording", zhTW: "停止錄音")
+                        : appLanguage.text(en: "Start Recording", zhTW: "開始錄音")
+                )
                     .fontWeight(.bold)
             }
             .foregroundStyle(.white)

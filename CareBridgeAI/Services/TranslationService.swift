@@ -1,17 +1,18 @@
 import Foundation
+import Translation
 
 enum TranslationService {
-    static func translate(
-        text: String,
+    static func configuration(
         from sourceLanguage: AppLanguage,
         to targetLanguage: AppLanguage
-    ) async -> String {
-        // MVP 原型：先用假翻譯，確認聊天室流程可以跑。
-        // 之後這裡可以改接 Apple Translation framework、OpenAI API、Google Translate API 等。
-        if sourceLanguage == targetLanguage {
-            return text
-        }
+    ) -> TranslationSession.Configuration {
+        TranslationSession.Configuration(
+            source: Locale.Language(identifier: sourceLanguage.code),
+            target: Locale.Language(identifier: targetLanguage.code)
+        )
+    }
 
-        return "[\(sourceLanguage.displayName) → \(targetLanguage.displayName)] \(text)"
+    static func translate(text: String, using session: TranslationSession) async throws -> String {
+        try await session.translate(text).targetText
     }
 }

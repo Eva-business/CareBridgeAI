@@ -41,8 +41,8 @@ struct HomeCardView<Content: View>: View {
 }
 
 #Preview {
-    HomeCardView(title: "AI 交接摘要", icon: "sparkles") {
-        Text("今天狀態穩定，食慾正常，晚間需提醒服藥。")
+    HomeCardView(title: "AI Handoff Summary", icon: "sparkles") {
+        Text("Status is stable today. Appetite is normal. Remind medication in the evening.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
     }

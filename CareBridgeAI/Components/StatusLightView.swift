@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct StatusLightView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let status: CareStatus
 
     var body: some View {
@@ -16,16 +18,16 @@ struct StatusLightView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("今日狀態")
+                Text(appLanguage.text(en: "Today's Status", zhTW: "今日狀態"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(status.rawValue)
+                Text(status.displayName(appLanguage))
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(status.color)
 
-                Text(status.description)
+                Text(status.description(appLanguage))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

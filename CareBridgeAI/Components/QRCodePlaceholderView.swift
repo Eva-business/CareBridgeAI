@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct QRCodePlaceholderView: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let groupCode: String
 
     var body: some View {
@@ -22,7 +24,7 @@ struct QRCodePlaceholderView: View {
                     .clipShape(Circle())
             }
 
-            Text("群組邀請碼")
+            Text(appLanguage.text(en: "Group Invite Code", zhTW: "群組邀請碼"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

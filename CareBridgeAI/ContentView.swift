@@ -78,13 +78,15 @@ struct ContentView: View {
                         if let manager = recipientDraft.caregivers.first(where: {
                             $0.role == .mainManager && $0.status == .approved
                         }) {
+                            var localizedManager = manager
+                            localizedManager.preferredLanguage = selectedLanguage
                             CareAccountStore.shared.registerUser(
-                                caregiver: manager,
+                                caregiver: localizedManager,
                                 careRecipientID: recipientDraft.careRecipientID
                             )
 
                             currentDraft = recipientDraft
-                            currentUser = manager
+                            currentUser = localizedManager
                             isLoggedIn = true
                         }
                     }
@@ -109,8 +111,10 @@ struct ContentView: View {
                         onboardingStep = 1
                     },
                     onLoginSuccess: { draft, user in
+                        var localizedUser = user
+                        localizedUser.preferredLanguage = selectedLanguage
                         currentDraft = draft
-                        currentUser = user
+                        currentUser = localizedUser
                         isLoggedIn = true
                     }
                 )

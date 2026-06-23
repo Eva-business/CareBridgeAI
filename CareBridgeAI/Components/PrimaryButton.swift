@@ -18,7 +18,7 @@ struct PrimaryButton: View {
 }
 
 #Preview {
-    PrimaryButton(title: "開始使用") {
+    PrimaryButton(title: "Get Started") {
         print("Button tapped")
     }
     .padding()

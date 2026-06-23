@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddTaskView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appLanguage) private var appLanguage
 
     let fixedType: CareTaskType
     let defaultDate: Date
@@ -43,7 +44,9 @@ struct AddTaskView: View {
     }
 
     private var pageTitle: String {
-        fixedType == .routine ? "新增常態任務" : "新增任務"
+        fixedType == .routine
+            ? appLanguage.text(en: "Add Routine Task", zhTW: "新增常態任務")
+            : appLanguage.text(en: "Add Task", zhTW: "新增任務")
     }
 
     private var datePickerComponents: DatePickerComponents {
@@ -60,8 +63,10 @@ struct AddTaskView: View {
                     VStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 18) {
                             FormTextField(
-                                title: "任務名稱",
-                                placeholder: fixedType == .routine ? "例如：早餐前吃藥、量血壓" : "例如：回診、復健、家人探訪",
+                                title: appLanguage.text(en: "Task Name", zhTW: "任務名稱"),
+                                placeholder: fixedType == .routine
+                                    ? appLanguage.text(en: "Example: Medication before breakfast, blood pressure check", zhTW: "例如：早餐前用藥、量血壓")
+                                    : appLanguage.text(en: "Example: Follow-up visit, rehab, family visit", zhTW: "例如：回診、復健、家人探訪"),
                                 text: $title
                             )
 
@@ -72,12 +77,18 @@ struct AddTaskView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(fixedType == .routine ? "提醒時間" : "日期與時間")
+                                Text(
+                                    fixedType == .routine
+                                        ? appLanguage.text(en: "Reminder Time", zhTW: "提醒時間")
+                                        : appLanguage.text(en: "Date & Time", zhTW: "日期與時間")
+                                )
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
 
                                 DatePicker(
-                                    fixedType == .routine ? "選擇時間" : "選擇日期時間",
+                                    fixedType == .routine
+                                        ? appLanguage.text(en: "Select time", zhTW: "選擇時間")
+                                        : appLanguage.text(en: "Select date and time", zhTW: "選擇日期與時間"),
                                     selection: $dueDate,
                                     displayedComponents: datePickerComponents
                                 )
@@ -88,7 +99,7 @@ struct AddTaskView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("備註")
+                                Text(appLanguage.text(en: "Notes", zhTW: "備註"))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
 
@@ -99,7 +110,7 @@ struct AddTaskView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(alignment: .topLeading) {
                                         if note.isEmpty {
-                                            Text("例如：飯後服用、攜帶健保卡、注意血壓")
+                                            Text(appLanguage.text(en: "Example: Take after meals, bring insurance card, monitor blood pressure", zhTW: "例如：飯後服用、攜帶健保卡、觀察血壓"))
                                                 .font(.subheadline)
                                                 .foregroundStyle(.gray.opacity(0.65))
                                                 .padding(.horizontal, 14)
@@ -118,15 +129,16 @@ struct AddTaskView: View {
             }
             .navigationTitle(pageTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .dismissKeyboardOnTap()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button(appLanguage.text(en: "Cancel", zhTW: "取消")) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("儲存") {
+                    Button(appLanguage.text(en: "Save", zhTW: "儲存")) {
                         saveTask()
                     }
                     .fontWeight(.bold)
@@ -138,7 +150,7 @@ struct AddTaskView: View {
 
     private var taskTypeInfo: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("任務類型")
+            Text(appLanguage.text(en: "Task Type", zhTW: "任務類型"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
 
@@ -147,11 +159,15 @@ struct AddTaskView: View {
                     .foregroundStyle(fixedType == .routine ? AppTheme.primaryGreen : AppTheme.warningYellow)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(fixedType.rawValue)
+                    Text(fixedType.displayName(appLanguage))
                         .font(.headline)
                         .fontWeight(.bold)
 
-                    Text(fixedType == .routine ? "可選擇星期幾重複提醒" : "只在指定日期提醒一次")
+                    Text(
+                        fixedType == .routine
+                            ? appLanguage.text(en: "Choose weekdays for repeated reminders", zhTW: "選擇固定重複提醒的星期")
+                            : appLanguage.text(en: "Reminds once on the selected date", zhTW: "在選定日期提醒一次")
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -167,7 +183,7 @@ struct AddTaskView: View {
     private var weekdaySelection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("重複星期")
+                Text(appLanguage.text(en: "Repeat Weekdays", zhTW: "重複星期"))
                     .font(.subheadline)
                     .fontWeight(.semibold)
 
@@ -176,7 +192,11 @@ struct AddTaskView: View {
                 Button {
                     toggleEveryday()
                 } label: {
-                    Text(selectedWeekdays.count == 7 ? "清除" : "每天")
+                    Text(
+                        selectedWeekdays.count == 7
+                            ? appLanguage.text(en: "Clear", zhTW: "清除")
+                            : appLanguage.text(en: "Every day", zhTW: "每天")
+                    )
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundStyle(AppTheme.primaryGreen)
@@ -188,7 +208,7 @@ struct AddTaskView: View {
                     Button {
                         toggleWeekday(weekday)
                     } label: {
-                        Text(weekday.shortName)
+                        Text(weekday.shortName(appLanguage))
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundStyle(selectedWeekdays.contains(weekday) ? .white : AppTheme.primaryGreen)
@@ -217,15 +237,17 @@ struct AddTaskView: View {
         let sortedDays = selectedWeekdays.sorted { $0.rawValue < $1.rawValue }
 
         if sortedDays.isEmpty {
-            return "請至少選擇一天"
+            return appLanguage.text(en: "Select at least one day", zhTW: "至少選擇一天")
         }
 
         if sortedDays.count == 7 {
-            return "將會每天提醒"
+            return appLanguage.text(en: "Will remind every day", zhTW: "將每天提醒")
         }
 
-        let days = sortedDays.map { $0.fullName }.joined(separator: "、")
-        return "將會在 \(days) 提醒"
+        let days = sortedDays
+            .map { $0.fullName(appLanguage) }
+            .joined(separator: appLanguage.isChinese ? "、" : ", ")
+        return appLanguage.text(en: "Will remind on \(days)", zhTW: "將於\(days)提醒")
     }
 
     private func toggleWeekday(_ weekday: Weekday) {

@@ -7,6 +7,19 @@ enum CaregiverRole: String, CaseIterable, Codable, Identifiable {
     case recipientSelf = "被照護者本人"
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .mainManager:
+            return "Main Manager"
+        case .family:
+            return "Family"
+        case .caregiver:
+            return "Caregiver"
+        case .recipientSelf:
+            return "Care Recipient"
+        }
+    }
 }
 
 enum MemberStatus: String, CaseIterable, Codable, Identifiable {
@@ -15,6 +28,17 @@ enum MemberStatus: String, CaseIterable, Codable, Identifiable {
     case rejected = "已拒絕"
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .pending:
+            return "Pending Review"
+        case .approved:
+            return "Joined"
+        case .rejected:
+            return "Rejected"
+        }
+    }
 }
 
 struct Caregiver: Identifiable, Codable {

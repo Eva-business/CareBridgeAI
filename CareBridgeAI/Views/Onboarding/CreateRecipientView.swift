@@ -71,7 +71,9 @@ struct CreateRecipientView: View {
                 }
                 .padding(24)
             }
+            .scrollDismissesKeyboard(.immediately) // 💡 補上支援滑動收起鍵盤
         }
+        .dismissKeyboardOnTap() // 套用專案內建的收鍵盤功能
     }
 
     private var relationshipPicker: some View {
