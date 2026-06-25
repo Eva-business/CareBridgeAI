@@ -1,0 +1,41 @@
+<!doctype html><html><body><template>
+  <style>
+    [data-composition-id="s5-summary"]{position:relative;width:1080px;height:1920px;overflow:hidden;background:#F7FAF6;color:#183326}
+    .s5-content{width:100%;height:100%;padding:120px 76px;display:flex;flex-direction:column;gap:28px}
+    .s5-label{font:700 21px "Space Mono";color:#1F8F57;letter-spacing:.1em}.s5-title{font:700 76px/1.15 "Noto Sans JP";letter-spacing:-.05em;max-width:900px}
+    .s5-copy{font:400 30px/1.55 "Noto Sans JP";color:#557064;max-width:860px}
+    .phones{position:relative;height:1040px;margin-top:30px}
+    .shot{position:absolute;width:500px;height:1085px;object-fit:cover;object-position:top;border:4px solid #183326;border-radius:58px;background:#FFFFFF;box-shadow:0 28px 70px rgba(13,104,64,.18)}
+    .green{left:15px;top:40px;transform:rotate(-5deg)}.yellow{right:8px;top:110px;transform:rotate(5deg)}.red{left:258px;top:240px;z-index:3}
+    .legend{position:absolute;z-index:10;right:65px;bottom:82px;display:flex;gap:20px;padding:22px 28px;background:#FFFFFF;border:3px solid #C8DCCE;border-radius:999px;font:700 19px "Space Mono"}
+    .legend span{display:flex;align-items:center;gap:9px}.dot{width:20px;height:20px;border-radius:50%}.g{background:#1F8F57}.y{background:#F2B833}.r{background:#E64038}
+    .badge{position:absolute;left:70px;bottom:82px;padding:20px 26px;border-radius:999px;background:#183326;color:#F7FAF6;font:700 18px "Space Mono"}
+  </style>
+  <div data-composition-id="s5-summary" data-width="1080" data-height="1920" data-duration="16.8">
+    <div class="s5-content">
+      <div class="s5-label" id="s5-label">FEATURE 01 / SMART HANDOFF</div>
+      <div class="s5-title" id="s5-title">AI 每日摘要，<br>一眼看懂今天。</div>
+      <div class="s5-copy" id="s5-copy">多筆照護紀錄自動彙整，搭配紅黃綠燈號，快速分辨穩定、需注意與異常。</div>
+      <div class="phones">
+        <img class="shot green" id="s5-green" src="assets/app/status-green.png">
+        <img class="shot yellow" id="s5-yellow" src="assets/app/status-yellow.jpg">
+        <img class="shot red" id="s5-red" src="assets/app/status-red.png">
+      </div>
+    </div>
+    <div class="badge" id="s5-badge">ON-DEVICE AI</div>
+    <div class="legend" id="s5-legend"><span><i class="dot g"></i>穩定</span><span><i class="dot y"></i>注意</span><span><i class="dot r"></i>異常</span></div>
+  </div>
+  <script>
+    window.__timelines=window.__timelines||{};var tl=gsap.timeline({paused:true});
+    tl.fromTo("#s5-label",{opacity:0,x:-40},{opacity:1,x:0,duration:.48,ease:"expo.out"},.2)
+      .fromTo("#s5-title",{opacity:0,y:56},{opacity:1,y:0,duration:.78,ease:"power4.out"},.4)
+      .fromTo("#s5-copy",{opacity:0,y:32},{opacity:1,y:0,duration:.6,ease:"sine.out"},.78)
+      .fromTo("#s5-green",{opacity:0,x:-120,rotation:-12},{opacity:1,x:0,rotation:-5,duration:.75,ease:"power3.out"},1.05)
+      .fromTo("#s5-yellow",{opacity:0,x:120,rotation:12},{opacity:1,x:0,rotation:5,duration:.78,ease:"back.out(1.25)"},1.22)
+      .fromTo("#s5-red",{opacity:0,y:130,scale:.82},{opacity:1,y:0,scale:1,duration:.85,ease:"expo.out"},1.48)
+      .fromTo("#s5-badge",{opacity:0,scale:.75},{opacity:1,scale:1,duration:.52,ease:"back.out(1.6)"},2.0)
+      .fromTo("#s5-legend",{opacity:0,x:65},{opacity:1,x:0,duration:.58,ease:"power2.out"},2.15)
+      .to("#s5-red",{y:-16,duration:3.6,ease:"sine.inOut",repeat:3,yoyo:true},2.5);
+    window.__timelines["s5-summary"]=tl;
+  </script>
+</template></body></html>

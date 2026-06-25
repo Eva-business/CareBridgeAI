@@ -1,0 +1,38 @@
+<!doctype html><html><body><template>
+  <style>
+    [data-composition-id="s10-close"]{position:relative;width:1080px;height:1920px;overflow:hidden;background:#E0F5E8;color:#183326}
+    .s10-content{width:100%;height:100%;padding:150px 90px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:34px}
+    .s10-logo{width:300px;height:300px;border-radius:76px;box-shadow:0 30px 80px rgba(13,104,64,.22)}
+    .s10-name{font:700 82px/1.05 "Noto Sans JP";letter-spacing:-.05em;color:#1F8F57}.s10-title{font:700 62px/1.35 "Noto Sans JP";letter-spacing:-.04em;max-width:880px}.s10-copy{font:400 31px/1.6 "Noto Sans JP";color:#557064;max-width:820px}
+    .bridge{width:830px;height:9px;background:#1F8F57;border-radius:99px;position:relative;margin:26px 0}.bridge:before,.bridge:after{content:"";position:absolute;width:48px;height:48px;border-radius:50%;top:-20px;background:#1F8F57;border:9px solid #F7FAF6}.bridge:before{left:0}.bridge:after{right:0}
+    .humans{display:flex;width:830px;justify-content:space-between;font:700 20px "Space Mono";color:#0D6840}
+    .credit{position:absolute;bottom:76px;left:90px;right:90px;display:flex;justify-content:space-between;font:400 18px "Space Mono";color:#557064}
+    .halo{position:absolute;width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,#FFFFFF 0%,rgba(255,255,255,0) 70%);left:140px;top:250px}
+  </style>
+  <div data-composition-id="s10-close" data-width="1080" data-height="1920" data-duration="12">
+    <div class="halo" id="s10-halo" data-layout-ignore></div>
+    <div class="s10-content">
+      <img class="s10-logo" id="s10-logo" src="assets/brand/app-icon.png">
+      <div class="s10-name" id="s10-name">CareBridge AI</div>
+      <div class="s10-title" id="s10-title">讓每一次交接，<br>都更清楚、更安心。</div>
+      <div class="s10-copy" id="s10-copy">把資訊接起來，也把照護的人，連在一起。</div>
+      <div class="bridge" id="s10-bridge"></div>
+      <div class="humans" id="s10-humans"><span>FAMILY</span><span>CAREGIVER</span></div>
+    </div>
+    <div class="credit" id="s10-credit"><span>橋下消波塊</span><span>國立臺灣海洋大學 資訊工程學系</span></div>
+  </div>
+  <script>
+    window.__timelines=window.__timelines||{};var tl=gsap.timeline({paused:true});
+    tl.fromTo("#s10-halo",{opacity:0,scale:.75},{opacity:1,scale:1,duration:1.2,ease:"sine.out"},.15)
+      .fromTo("#s10-logo",{opacity:0,scale:.62,rotation:-10},{opacity:1,scale:1,rotation:0,duration:.82,ease:"back.out(1.45)"},.35)
+      .fromTo("#s10-name",{opacity:0,y:42},{opacity:1,y:0,duration:.65,ease:"power3.out"},.78)
+      .fromTo("#s10-title",{opacity:0,y:50},{opacity:1,y:0,duration:.78,ease:"expo.out"},1.08)
+      .fromTo("#s10-copy",{opacity:0,y:28},{opacity:1,y:0,duration:.58,ease:"sine.out"},1.48)
+      .fromTo("#s10-bridge",{scaleX:0,transformOrigin:"left center"},{scaleX:1,duration:1,ease:"power3.inOut"},1.78)
+      .fromTo("#s10-humans",{opacity:0},{opacity:1,duration:.55,ease:"power2.out"},2.25)
+      .fromTo("#s10-credit",{opacity:0,y:25},{opacity:1,y:0,duration:.5,ease:"power3.out"},2.55)
+      .to("#s10-logo",{scale:1.035,duration:2.8,ease:"sine.inOut",repeat:2,yoyo:true},2.8)
+      .to("[data-composition-id='s10-close']",{opacity:0,duration:.8,ease:"power1.in"},11.1);
+    window.__timelines["s10-close"]=tl;
+  </script>
+</template></body></html>

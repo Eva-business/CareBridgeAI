@@ -1,0 +1,44 @@
+<!doctype html><html><body><template>
+  <style>
+    [data-composition-id="s2-language"]{position:relative;width:1080px;height:1920px;overflow:hidden;background:#F7FAF6;color:#183326}
+    .s2-content{width:100%;height:100%;padding:140px 82px;display:flex;flex-direction:column;gap:34px}
+    .s2-label{font:700 22px "Space Mono";color:#E64038;letter-spacing:.12em}
+    .s2-title{font:700 82px/1.18 "Noto Sans JP";letter-spacing:-.045em;max-width:900px}
+    .s2-ghost{position:absolute;top:270px;right:-30px;font:700 190px "Noto Sans JP";color:#E0F5E8;transform:rotate(90deg)}
+    .bubble{max-width:790px;padding:34px 40px;border:3px solid #C8DCCE;border-radius:42px;background:#FFFFFF;box-shadow:0 22px 60px rgba(13,104,64,.10)}
+    .bubble strong{display:block;font:700 23px "Space Mono";margin-bottom:14px;color:#1F8F57}.bubble p{margin:0;font:400 34px/1.55 "Noto Sans JP"}
+    .b1{align-self:flex-start;margin-top:80px}.b2{align-self:flex-end;border-color:#F2B833}.b2 strong{color:#9A6900}
+    .gap{display:flex;align-items:center;justify-content:center;gap:18px;margin:28px 0;font:700 24px "Space Mono";color:#E64038}
+    .gap:before,.gap:after{content:"";width:220px;height:4px;background:#E64038}
+    .wave{height:90px;display:flex;align-items:center;justify-content:center;gap:10px}
+    .wave i{display:block;width:12px;border-radius:12px;background:#1F8F57}.wave i:nth-child(1){height:24px}.wave i:nth-child(2){height:70px}.wave i:nth-child(3){height:42px}.wave i:nth-child(4){height:86px}.wave i:nth-child(5){height:34px}.wave i:nth-child(6){height:62px}
+    .s2-note{font:400 31px/1.6 "Noto Sans JP";color:#557064;border-top:3px solid #C8DCCE;padding-top:28px}
+    .s2-meta{position:absolute;bottom:74px;left:82px;right:82px;display:flex;justify-content:space-between;font:400 19px "Space Mono";color:#557064}
+  </style>
+  <div data-composition-id="s2-language" data-width="1080" data-height="1920" data-duration="14.8">
+    <div class="s2-ghost" id="s2-ghost">語言</div>
+    <div class="s2-content">
+      <div class="s2-label" id="s2-label">PAIN POINT / LANGUAGE</div>
+      <div class="s2-title" id="s2-title">語言不同，<br>照護情境也被切碎。</div>
+      <div class="bubble b1" id="s2-b1"><strong>CAREGIVER · ENGLISH</strong><p>Grandma felt dizzy after lunch…</p></div>
+      <div class="gap" id="s2-gap">CONTEXT LOST</div>
+      <div class="bubble b2" id="s2-b2"><strong>家屬 · 中文</strong><p>是什麼時候開始？有吃藥嗎？</p></div>
+      <div class="wave" id="s2-wave"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="s2-note" id="s2-note">身體不適、情緒變化、突發狀況，往往無法靠幾個單字完整交代。</div>
+    </div>
+    <div class="s2-meta" id="s2-meta"><span>LANG / ZH—EN</span><span>MESSAGE ≠ MEANING</span></div>
+  </div>
+  <script>
+    window.__timelines=window.__timelines||{};var tl=gsap.timeline({paused:true});
+    tl.fromTo("#s2-label",{opacity:0,x:-44},{opacity:1,x:0,duration:.5,ease:"expo.out"},.2)
+      .fromTo("#s2-title",{opacity:0,y:62},{opacity:1,y:0,duration:.8,ease:"power4.out"},.38)
+      .fromTo("#s2-ghost",{opacity:0,rotation:84},{opacity:1,rotation:90,duration:1.2,ease:"sine.out"},.25)
+      .fromTo("#s2-b1",{opacity:0,x:-100,rotation:-2},{opacity:1,x:0,rotation:0,duration:.7,ease:"power3.out"},.9)
+      .fromTo("#s2-b2",{opacity:0,x:100,rotation:2},{opacity:1,x:0,rotation:0,duration:.72,ease:"back.out(1.25)"},1.22)
+      .fromTo("#s2-gap",{opacity:0,scaleX:.55},{opacity:1,scaleX:1,duration:.52,ease:"power2.out"},1.48)
+      .fromTo("#s2-wave i",{scaleY:.15,transformOrigin:"center"},{scaleY:1,duration:.45,ease:"elastic.out(1,.45)",stagger:.055},1.75)
+      .fromTo("#s2-note",{opacity:0,y:28},{opacity:1,y:0,duration:.6,ease:"sine.out"},2.1)
+      .fromTo("#s2-meta",{opacity:0},{opacity:1,duration:.5,ease:"power1.out"},2.35);
+    window.__timelines["s2-language"]=tl;
+  </script>
+</template></body></html>

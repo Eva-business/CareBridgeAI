@@ -1,0 +1,15 @@
+{
+  "name": "carebridge-horizontal-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.7.6 preview",
+    "check": "npx --yes hyperframes@0.7.6 lint && npx --yes hyperframes@0.7.6 validate && npx --yes hyperframes@0.7.6 inspect",
+    "render:draft": "npx --yes hyperframes@0.7.6 render --quality draft --output renders/CareBridgeAI_Promo_16x9_draft.mp4",
+    "render": "npx --yes hyperframes@0.7.6 render --quality high --fps 30 --output renders/CareBridgeAI_Promo_16x9.mp4"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0"
+  }
+}

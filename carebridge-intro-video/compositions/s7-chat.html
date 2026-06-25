@@ -1,0 +1,39 @@
+<!doctype html><html><body><template>
+  <style>
+    [data-composition-id="s7-chat"]{position:relative;width:1080px;height:1920px;overflow:hidden;background:#F7FAF6;color:#183326}
+    .s7-content{width:100%;height:100%;padding:120px 78px;display:flex;flex-direction:column;gap:26px}
+    .s7-label{font:700 21px "Space Mono";color:#1F8F57;letter-spacing:.1em}.s7-title{font:700 76px/1.15 "Noto Sans JP";letter-spacing:-.05em}.s7-copy{font:400 29px/1.55 "Noto Sans JP";color:#557064}
+    .chat-wrap{position:relative;height:1160px;margin-top:25px}
+    .chat-shot{position:absolute;width:600px;height:1300px;left:245px;top:10px;object-fit:cover;object-position:top;border:4px solid #183326;border-radius:62px;box-shadow:0 30px 80px rgba(13,104,64,.17)}
+    .lang{position:absolute;padding:20px 26px;border-radius:999px;border:3px solid #1F8F57;background:#FFFFFF;font:700 22px "Space Mono";z-index:2}.en{left:30px;top:290px}.zh{right:5px;top:720px}
+    .bridge{position:absolute;left:110px;top:600px;width:760px;height:9px;background:#1F8F57;border-radius:99px;transform:rotate(18deg);z-index:1}.bridge:after{content:"TRANSLATE";position:absolute;left:290px;top:-50px;padding:14px 20px;border-radius:999px;background:#183326;color:#F7FAF6;font:700 17px "Space Mono"}
+    .wave{position:absolute;left:38px;bottom:130px;display:flex;gap:9px;align-items:center;height:100px}.wave i{width:12px;border-radius:8px;background:#1F8F57}.wave i:nth-child(1){height:30px}.wave i:nth-child(2){height:82px}.wave i:nth-child(3){height:46px}.wave i:nth-child(4){height:96px}.wave i:nth-child(5){height:58px}
+    .s7-foot{position:absolute;bottom:70px;right:78px;font:700 19px "Space Mono";color:#0D6840}
+  </style>
+  <div data-composition-id="s7-chat" data-width="1080" data-height="1920" data-duration="14.8">
+    <div class="s7-content">
+      <div class="s7-label" id="s7-label">FEATURE 03 / CROSS-LANGUAGE CHAT</div>
+      <div class="s7-title" id="s7-title">用熟悉的語言說，<br>讓彼此都聽懂。</div>
+      <div class="s7-copy" id="s7-copy">語音轉文字，加上即時翻譯，保留的不只是句子，更是完整照護情境。</div>
+      <div class="chat-wrap">
+        <img class="chat-shot" id="s7-shot" src="assets/app/chat.jpg">
+        <div class="lang en" id="s7-en">ENGLISH</div><div class="lang zh" id="s7-zh">繁體中文</div>
+        <div class="bridge" id="s7-bridge"></div><div class="wave" id="s7-wave"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="s7-foot" id="s7-foot">SPEECH → TEXT → TRANSLATION</div>
+  </div>
+  <script>
+    window.__timelines=window.__timelines||{};var tl=gsap.timeline({paused:true});
+    tl.fromTo("#s7-label",{opacity:0,x:-40},{opacity:1,x:0,duration:.48,ease:"expo.out"},.2)
+      .fromTo("#s7-title",{opacity:0,y:58},{opacity:1,y:0,duration:.78,ease:"power4.out"},.4)
+      .fromTo("#s7-copy",{opacity:0,y:30},{opacity:1,y:0,duration:.58,ease:"sine.out"},.8)
+      .fromTo("#s7-shot",{opacity:0,y:100,scale:.92},{opacity:1,y:0,scale:1,duration:.85,ease:"power3.out"},1.08)
+      .fromTo("#s7-en",{opacity:0,x:-80,rotation:-8},{opacity:1,x:0,rotation:0,duration:.58,ease:"back.out(1.35)"},1.42)
+      .fromTo("#s7-zh",{opacity:0,x:80,rotation:8},{opacity:1,x:0,rotation:0,duration:.62,ease:"power2.out"},1.62)
+      .fromTo("#s7-bridge",{scaleX:0,transformOrigin:"left center"},{scaleX:1,duration:.8,ease:"power3.inOut"},1.88)
+      .fromTo("#s7-wave i",{scaleY:.15},{scaleY:1,duration:.42,ease:"elastic.out(1,.45)",stagger:.06},2.15)
+      .fromTo("#s7-foot",{opacity:0,x:42},{opacity:1,x:0,duration:.48,ease:"power2.out"},2.42);
+    window.__timelines["s7-chat"]=tl;
+  </script>
+</template></body></html>
