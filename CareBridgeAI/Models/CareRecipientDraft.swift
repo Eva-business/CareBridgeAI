@@ -253,6 +253,7 @@ extension String {
             "Mood was calm after a video call with family. Participated in light conversation and followed simple instructions well.": "與家人視訊後情緒平穩，有簡短對話，也能配合簡單指令。",
             "Lunch: ate about 70% of rice, steamed fish, and vegetables. Drank another 200 ml of water. Continue encouraging fluids in the afternoon.": "午餐約吃完 70% 白飯、清蒸魚與蔬菜，另喝 200 ml 水。下午需持續鼓勵補水。",
             "Completed 15 minutes of seated leg exercises. Mild knee stiffness was noted, but pain did not increase.": "完成 15 分鐘坐姿腿部運動。膝蓋略僵硬，但疼痛沒有增加。",
+            "The afternoon medication was missed before the meal. Please confirm the next dose with the caregiver and avoid taking a double dose.": "下午飯前漏服藥物，請與照護者確認下一次服藥時間，避免重複服藥。",
             "Morning blood pressure check": "早晨血壓量測",
             "Record systolic, diastolic, and any dizziness before medication.": "服藥前記錄收縮壓、舒張壓與是否頭暈。",
             "Give morning medication": "給早晨藥物",

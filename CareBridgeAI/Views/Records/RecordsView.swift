@@ -263,7 +263,8 @@ struct RecordsView: View {
                 Task {
                     let result = await CareAIService.summarize(
                         selectedDateRecords,
-                        applying24HourWindow: false
+                        applying24HourWindow: false,
+                        language: recordingLanguage
                     )
                     generatedSummary = result
                     if Calendar.current.isDateInToday(selectedDate) {

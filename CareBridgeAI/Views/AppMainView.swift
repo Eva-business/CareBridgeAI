@@ -33,73 +33,60 @@ struct AppMainView: View {
         self.onLogout = onLogout
     }
 
-    private static func englishContentSnapshot(_ snapshot: CareContentSnapshot) -> CareContentSnapshot {
-        CareContentSnapshot(
-            draft: snapshot.draft,
-            records: snapshot.records.map(englishRecord),
-            tasks: snapshot.tasks.map(englishTask),
-            memos: snapshot.memos.map(englishMemo),
-            profilePhotoData: snapshot.profilePhotoData
-        )
-    }
-
     private static func normalizedDemoContentSnapshot(_ snapshot: CareContentSnapshot) -> CareContentSnapshot {
-        guard snapshot.containsLegacyDemoText else {
-            return englishContentSnapshot(snapshot)
-        }
-
-        return demoContentSnapshot(
-            draft: snapshot.draft,
-            profilePhotoData: snapshot.profilePhotoData
-        )
+        normalizedBundledDemoConditions(in: snapshot)
     }
 
-    private static func demoContentSnapshot(
-        draft: CareRecipientDraft,
-        profilePhotoData: Data? = nil
+    private static func normalizedBundledDemoConditions(
+        in snapshot: CareContentSnapshot
     ) -> CareContentSnapshot {
-        CareContentSnapshot(
-            draft: draft,
-            records: demoRecords,
-            tasks: demoTasks,
-            memos: demoMemos,
-            profilePhotoData: profilePhotoData
-        )
-    }
+        var normalized = snapshot
+        normalized.records = snapshot.records.map { record in
+            if record.content == bundledMissedMedicationDemoContent {
+                var updated = record
+                updated.content = bundledExerciseDemoContent
+                updated.category = .custom
+                updated.condition = .normal
+                return updated
+            }
 
-    private static func englishRecord(_ record: CareRecord) -> CareRecord {
-        var next = record
-        let content = record.content.careBridgeEnglishCareTextValue
-        next.content = content.containsCareBridgeCJKText ? "Care detail recorded." : content
-        next.createdBy = record.createdBy.careBridgeEnglishCareTextValue
-        if next.createdBy.containsCareBridgeCJKText {
-            next.createdBy = "Caregiver"
+            if record.content == bundledExerciseDemoContent {
+                var updated = record
+                updated.category = .custom
+                updated.condition = .normal
+                return updated
+            }
+
+            guard record.condition == .normal,
+                  bundledStableDemoRecordContents.contains(record.content)
+            else {
+                return record
+            }
+
+            var updated = record
+            updated.condition = .good
+            return updated
         }
-        return next
+        return normalized
     }
 
-    private static func englishTask(_ task: CareTask) -> CareTask {
-        var next = task
-        let title = task.title.careBridgeEnglishCareTextValue
-        let note = task.note.careBridgeEnglishCareTextValue
-        next.title = title.containsCareBridgeCJKText ? "Care Task" : title
-        next.note = note.containsCareBridgeCJKText ? "" : note
-        return next
-    }
+    private static let bundledStableDemoRecordContents: Set<String> = [
+        "Breakfast: finished oatmeal, banana slices, and 250 ml of warm water. Appetite was slightly lower than usual but no choking was observed.",
+        "Lunch: ate about 70% of rice, steamed fish, and vegetables. Drank another 200 ml of water. Continue encouraging fluids in the afternoon."
+    ]
 
-    private static func englishMemo(_ memo: Memo) -> Memo {
-        var next = memo
-        let content = memo.content.careBridgeEnglishCareTextValue
-        next.content = content.containsCareBridgeCJKText ? "Personal care note." : content
-        return next
-    }
+    private static let bundledExerciseDemoContent =
+        "Completed 15 minutes of seated leg exercises. Mild knee stiffness was noted, but pain did not increase."
+
+    private static let bundledMissedMedicationDemoContent =
+        "The afternoon medication was missed before the meal. Please confirm the next dose with the caregiver and avoid taking a double dose."
 
     private static var demoRecords: [CareRecord] {
         [
             CareRecord(
                 content: "Breakfast: finished oatmeal, banana slices, and 250 ml of warm water. Appetite was slightly lower than usual but no choking was observed.",
                 category: .food,
-                condition: .normal,
+                condition: .good,
                 createdAt: todayAt(hour: 7, minute: 45),
                 createdBy: "Morning Caregiver"
             ),
@@ -127,12 +114,12 @@ struct AppMainView: View {
             CareRecord(
                 content: "Lunch: ate about 70% of rice, steamed fish, and vegetables. Drank another 200 ml of water. Continue encouraging fluids in the afternoon.",
                 category: .food,
-                condition: .normal,
+                condition: .good,
                 createdAt: todayAt(hour: 12, minute: 40),
                 createdBy: "Day Caregiver"
             ),
             CareRecord(
-                content: "Completed 15 minutes of seated leg exercises. Mild knee stiffness was noted, but pain did not increase.",
+                content: bundledExerciseDemoContent,
                 category: .custom,
                 condition: .normal,
                 createdAt: todayAt(hour: 15, minute: 20),
@@ -302,7 +289,10 @@ struct AppMainView: View {
             NotificationService.shared.syncNotifications(for: tasks)
         }
         .task(id: persistenceFingerprint) {
-            let result = await CareAIService.summarize(records)
+            let result = await CareAIService.summarize(
+                records,
+                language: currentUser.preferredLanguage
+            )
             applyAISummary(result)
         }
         .onChange(of: persistenceFingerprint) { _, _ in

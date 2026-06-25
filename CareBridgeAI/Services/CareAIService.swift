@@ -69,7 +69,7 @@ private enum GeneratedCareCondition {
 @available(iOS 26.0, *)
 @Generable
 private struct GeneratedCareSummary {
-    @Guide(description: "A concise English caregiver handoff summary")
+    @Guide(description: "A concise caregiver handoff summary in the requested language")
     var summary: String
 
     var status: GeneratedCareStatus
@@ -113,7 +113,8 @@ enum CareAIService {
 
     static func summarize(
         _ records: [CareRecord],
-        applying24HourWindow: Bool = true
+        applying24HourWindow: Bool = true,
+        language: AppLanguage = .en
     ) async -> CareAISummary {
         let recentRecords: [CareRecord]
         if applying24HourWindow {
@@ -124,14 +125,17 @@ enum CareAIService {
         }
 
         guard !recentRecords.isEmpty else {
-            let text = generateSummary(from: recentRecords)
+            let text = generateSummary(from: recentRecords, language: language)
             return CareAISummary(text: text, status: .good, usedOnDeviceModel: false)
         }
 
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *), SystemLanguageModel.default.availability == .available {
             do {
-                let result = try await summarizeWithFoundationModels(recentRecords)
+                let result = try await summarizeWithFoundationModels(
+                    recentRecords,
+                    language: language
+                )
                 return CareAISummary(
                     text: result.text,
                     status: generateStatus(from: recentRecords),
@@ -143,7 +147,7 @@ enum CareAIService {
         }
         #endif
 
-        let text = generateSummary(from: recentRecords)
+        let text = generateSummary(from: recentRecords, language: language)
         return CareAISummary(
             text: text,
             status: generateStatus(from: recentRecords),
@@ -243,27 +247,44 @@ enum CareAIService {
         return generateStatus(from: unevaluatedText)
     }
 
-    static func generateSummary(from records: [CareRecord]) -> String {
+    static func generateSummary(
+        from records: [CareRecord],
+        language: AppLanguage = .en
+    ) -> String {
         let sortedRecords = records.sorted { $0.createdAt > $1.createdAt }
         guard !sortedRecords.isEmpty else {
-            return "No care records have been added today. No clear abnormal information is available yet."
+            return language.text(
+                en: "No care records have been added today. No clear abnormal information is available yet.",
+                zhTW: "今天尚未新增照護紀錄，目前沒有明確異常資訊。"
+            )
         }
 
         var parts: [String] = []
         for category in CareRecordCategory.allCases {
             if let latest = sortedRecords.first(where: { $0.category == category }) {
-                parts.append("\(category.displayName): \(latest.content.careBridgeEnglishCareDisplayValue)")
+                let content = latest.content.localizedCareText(language)
+                let separator = language.isChinese ? "：" : ": "
+                parts.append("\(category.displayName(language))\(separator)\(content)")
             }
         }
 
         let badCount = sortedRecords.filter { $0.condition == .bad }.count
         let normalCount = sortedRecords.filter { $0.condition == .normal }.count
         if badCount > 0 {
-            parts.append("\(badCount) record(s) indicate poor condition today. Please review promptly.")
+            parts.append(language.text(
+                en: "\(badCount) record(s) indicate poor condition today. Please review promptly.",
+                zhTW: "今天有 \(badCount) 筆狀況不佳的紀錄，請盡快查看。"
+            ))
         } else if normalCount > 0 {
-            parts.append("\(normalCount) record(s) need follow-up observation today.")
+            parts.append(language.text(
+                en: "\(normalCount) record(s) need follow-up observation today.",
+                zhTW: "今天有 \(normalCount) 筆紀錄需要持續觀察。"
+            ))
         } else {
-            parts.append("Overall status is currently stable.")
+            parts.append(language.text(
+                en: "Overall status is currently stable.",
+                zhTW: "整體狀態目前穩定。"
+            ))
         }
         return parts.joined(separator: " ")
     }
@@ -468,7 +489,10 @@ private extension CareAIService {
         )
     }
 
-    static func summarizeWithFoundationModels(_ records: [CareRecord]) async throws -> CareAISummary {
+    static func summarizeWithFoundationModels(
+        _ records: [CareRecord],
+        language: AppLanguage
+    ) async throws -> CareAISummary {
         let recordText = records
             .sorted { $0.createdAt < $1.createdAt }
             .map {
@@ -476,11 +500,14 @@ private extension CareAIService {
             }
             .joined(separator: "\n")
 
+        let outputLanguage = language.isChinese ? "Traditional Chinese (Taiwan)" : "English"
         let session = LanguageModelSession(instructions: """
-            You create a factual caregiver shift handoff in English.
+            You create a factual caregiver shift handoff in \(outputLanguage).
             Mention important food, medication, bowel, mood, and safety facts. Do not invent diagnoses or medical advice.
-            Keep the summary under 80 English words. Mark danger only for urgent explicit symptoms, warning for observations needing follow-up, otherwise good.
-            Always write the summary in English, regardless of the record language.
+            Include only facts found in the supplied records. Preserve medication names, dosages, times, measurements, and quantities exactly.
+            Do not add explanations, diagnoses, recommendations, or events that are absent from the records.
+            Keep the summary concise. Mark danger only for urgent explicit symptoms, warning for observations needing follow-up, otherwise good.
+            Write only in \(outputLanguage), regardless of the record language.
             """)
         let response = try await session.respond(
             to: recordText,

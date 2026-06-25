@@ -6,24 +6,6 @@
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
       buildArchitectures = "Automatic">
-      <PreActions>
-         <ExecutionAction
-            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
-            <ActionContent
-               title = "Reset derived build products"
-               scriptText = "DERIVED_BUILD_DIR=&quot;${BUILD_ROOT%/Products}&quot;&#10;rm -rf &quot;${DERIVED_BUILD_DIR}/Intermediates.noindex&quot; &quot;${DERIVED_BUILD_DIR}/Products&quot;&#10;">
-               <EnvironmentBuildable>
-                  <BuildableReference
-                     BuildableIdentifier = "primary"
-                     BlueprintIdentifier = "45C8DD052FE52C4D002DA7CF"
-                     BuildableName = "CareBridgeAI.app"
-                     BlueprintName = "CareBridgeAI"
-                     ReferencedContainer = "container:CareBridgeAI.xcodeproj">
-                  </BuildableReference>
-               </EnvironmentBuildable>
-            </ActionContent>
-         </ExecutionAction>
-      </PreActions>
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
