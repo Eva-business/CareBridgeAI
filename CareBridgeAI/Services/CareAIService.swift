@@ -44,7 +44,7 @@ private struct GeneratedCareRecord {
 
     var condition: GeneratedCareCondition
 
-    @Guide(description: "A short English factual record for only this category")
+    @Guide(description: "A short factual record for only this category, written in the requested output language")
     var content: String
 }
 
@@ -85,7 +85,7 @@ private enum GeneratedCareStatus {
 #endif
 
 enum CareAIService {
-    static func analyze(_ text: String) async -> CareAIAnalysis {
+    static func analyze(_ text: String, language: AppLanguage = .en) async -> CareAIAnalysis {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return CareAIAnalysis(categories: [], condition: nil, suggestions: [], usedOnDeviceModel: false)
@@ -94,7 +94,7 @@ enum CareAIService {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *), SystemLanguageModel.default.availability == .available {
             do {
-                return try await analyzeWithFoundationModels(trimmed)
+                return try await analyzeWithFoundationModels(trimmed, language: language)
             } catch {
                 // The deterministic fallback keeps recording available if the model refuses or is busy.
             }
@@ -106,7 +106,7 @@ enum CareAIService {
         return CareAIAnalysis(
             categories: categories,
             condition: condition,
-            suggestions: buildFallbackSuggestions(from: trimmed, categories: categories, condition: condition),
+            suggestions: buildFallbackSuggestions(from: trimmed, categories: categories, condition: condition, language: language),
             usedOnDeviceModel: false
         )
     }
@@ -343,9 +343,17 @@ enum CareAIService {
     private static func buildFallbackSuggestions(
         from text: String,
         categories: [CareRecordCategory],
-        condition: RecordCondition?
+        condition: RecordCondition?,
+        language: AppLanguage = .en
     ) -> [CareAIRecordSuggestion] {
-        buildRecordSuggestions(from: text, categories: categories, condition: condition)
+        buildRecordSuggestions(from: text, categories: categories, condition: condition).map { suggestion in
+            guard language.usesDynamicTargetTranslation else { return suggestion }
+            return CareAIRecordSuggestion(
+                category: suggestion.category,
+                condition: suggestion.condition,
+                content: suggestion.content.localizedCareText(language)
+            )
+        }
     }
 
     private static func uniqueCategories(_ categories: [CareRecordCategory]) -> [CareRecordCategory] {
@@ -449,13 +457,14 @@ enum CareAIService {
 #if canImport(FoundationModels)
 @available(iOS 26.0, *)
 private extension CareAIService {
-    static func analyzeWithFoundationModels(_ text: String) async throws -> CareAIAnalysis {
+    static func analyzeWithFoundationModels(_ text: String, language: AppLanguage) async throws -> CareAIAnalysis {
+        let outputLanguage = language.foundationModelOutputLanguageName
         let session = LanguageModelSession(instructions: """
             You classify caregiver notes. Extract every relevant category, even when one note contains multiple events.
             Use custom only when none of food, medicine, bowel, or mood applies.
             Infer condition only from explicit evidence. bad means urgent or clearly abnormal; normal means mild concern; good means explicitly stable.
-            Also split the note into separate concise English records. Each record must contain only the facts for its category and have its own condition.
-            Always write generated record content in English, regardless of the input language.
+            Also split the note into separate concise records in \(outputLanguage). Each record must contain only the facts for its category and have its own condition.
+            Always write generated record content only in \(outputLanguage), regardless of the input language.
             """)
         let response = try await session.respond(
             to: text,
@@ -473,7 +482,8 @@ private extension CareAIService {
         let fallbackSuggestions = buildFallbackSuggestions(
             from: text,
             categories: categories,
-            condition: response.content.condition?.recordCondition
+            condition: response.content.condition?.recordCondition,
+            language: language
         )
         let suggestions = categories.map { category in
             generatedSuggestions.first(where: { $0.category == category && !$0.content.isEmpty })
@@ -500,7 +510,7 @@ private extension CareAIService {
             }
             .joined(separator: "\n")
 
-        let outputLanguage = language.isChinese ? "Traditional Chinese (Taiwan)" : "English"
+        let outputLanguage = language.foundationModelOutputLanguageName
         let session = LanguageModelSession(instructions: """
             You create a factual caregiver shift handoff in \(outputLanguage).
             Mention important food, medication, bowel, mood, and safety facts. Do not invent diagnoses or medical advice.

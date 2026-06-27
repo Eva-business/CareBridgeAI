@@ -122,7 +122,7 @@ struct ChatView: View {
                     .font(.headline)
                     .fontWeight(.bold)
 
-                Text(appLanguage.text(en: "Current language: \(currentUser.preferredLanguage.englishName)", zhTW: "目前語言：\(currentUser.preferredLanguage.displayName)"))
+                Text(appLanguage.text(en: "Current language: \(currentUser.preferredLanguage.displayName(in: appLanguage))", zhTW: "目前語言：\(currentUser.preferredLanguage.displayName)"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

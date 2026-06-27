@@ -132,7 +132,7 @@ struct CaregiverListDetailView: View {
             caregiverInfoRow(
                 icon: "globe.asia.australia.fill",
                 title: appLanguage.text(en: "Language", zhTW: "語言"),
-                value: appLanguage.isChinese ? caregiver.preferredLanguage.displayName : caregiver.preferredLanguage.englishName
+                value: caregiver.preferredLanguage.displayName(in: appLanguage)
             )
             
             caregiverInfoRow(

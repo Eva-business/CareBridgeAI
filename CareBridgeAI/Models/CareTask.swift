@@ -127,7 +127,7 @@ struct CareTask: Identifiable, Codable {
         let days = repeatWeekdays
             .sorted { $0.rawValue < $1.rawValue }
             .map { $0.shortName(language) }
-            .joined(separator: language.isChinese ? "、" : ", ")
+            .joined(separator: (language.isChinese || language.isJapanese) ? "、" : ", ")
 
         return language.text(
             en: "Every \(days) at \(dueDate.formatted(date: .omitted, time: .shortened))",

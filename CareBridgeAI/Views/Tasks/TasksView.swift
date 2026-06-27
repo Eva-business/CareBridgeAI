@@ -195,7 +195,7 @@ struct TasksView: View {
             }
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
-                ForEach(appLanguage.isChinese ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { weekday in
+                ForEach(Weekday.allCases.map { $0.shortName(appLanguage) }, id: \.self) { weekday in
                     Text(weekday)
                         .font(.caption)
                         .fontWeight(.semibold)

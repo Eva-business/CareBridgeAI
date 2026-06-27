@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ProfileInfoRow: View {
+    @Environment(\.appLanguage) private var appLanguage
+
     let icon: String
     let title: String
     let value: String
@@ -19,7 +21,7 @@ struct ProfileInfoRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(value.isEmpty ? "Not provided" : value)
+                LocalizedDataText(text: value.isEmpty ? appLanguage.text(en: "Not provided", zhTW: "未提供") : value)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(value.isEmpty ? .secondary : .primary)

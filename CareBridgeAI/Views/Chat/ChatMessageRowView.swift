@@ -73,7 +73,7 @@ struct ChatMessageRowView: View {
 
                     HStack(spacing: 6) {
                         Image(systemName: "globe.asia.australia.fill")
-                        Text(appLanguage.isChinese ? message.originalLanguage.displayName : message.originalLanguage.englishName)
+                        Text(message.originalLanguage.displayName(in: appLanguage))
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -85,7 +85,7 @@ struct ChatMessageRowView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 6) {
                                 Image(systemName: "translate")
-                                Text(appLanguage.isChinese ? translatedLanguage.displayName : translatedLanguage.englishName)
+                                Text(translatedLanguage.displayName(in: appLanguage))
                             }
                             .font(.caption2)
                             .foregroundStyle(AppTheme.primaryGreen)

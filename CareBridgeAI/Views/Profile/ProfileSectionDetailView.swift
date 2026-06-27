@@ -813,6 +813,9 @@ struct ProfileSectionDetailView: View {
             return field(fallbackEN, fallbackZH)
         }
 
+        if appLanguage.isJapanese {
+            return trimmed.containsCareBridgeCJKText ? field(fallbackEN, fallbackZH) : trimmed
+        }
         return appLanguage.isChinese ? trimmed : trimmed.careBridgeEnglishDisplayValue
     }
 

@@ -66,7 +66,7 @@ struct VoiceChatInputView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(AppTheme.primaryGreen)
 
-            Text(appLanguage.text(en: "Recording in \(currentUser.preferredLanguage.englishName)", zhTW: "使用\(currentUser.preferredLanguage.displayName)錄音"))
+            Text(appLanguage.text(en: "Recording in \(currentUser.preferredLanguage.displayName(in: appLanguage))", zhTW: "使用\(currentUser.preferredLanguage.displayName)錄音"))
                 .font(.headline)
                 .fontWeight(.bold)
 

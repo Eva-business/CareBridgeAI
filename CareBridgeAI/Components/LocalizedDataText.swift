@@ -31,7 +31,7 @@ struct LocalizedDataText: View {
     private var deterministicText: String {
         guard !text.isEmpty else { return text }
 
-        if appLanguage.isChinese {
+        if appLanguage.isChinese || appLanguage.usesDynamicTargetTranslation {
             return text.localizedCareText(appLanguage)
         }
 
@@ -64,7 +64,23 @@ struct LocalizedDataText: View {
     }
 
     private var sourceLanguageForTranslation: AppLanguage? {
-        guard appLanguage == .zhTW || appLanguage == .en else { return nil }
+        guard appLanguage == .zhTW || appLanguage == .en || appLanguage.usesDynamicTargetTranslation else { return nil }
+
+        if appLanguage.usesDynamicTargetTranslation {
+            if appLanguage == .ja, text.containsCareBridgeJapaneseText {
+                return nil
+            }
+
+            if appLanguage == .th, text.containsCareBridgeThaiText {
+                return nil
+            }
+
+            if text.containsCareBridgeCJKText {
+                return deterministicText.containsCareBridgeJapaneseText ? nil : .zhTW
+            }
+
+            return deterministicText.stillContainsEnglishWords ? .en : nil
+        }
 
         if appLanguage == .zhTW {
             guard !text.containsCareBridgeCJKText else { return nil }
@@ -87,5 +103,13 @@ struct LocalizedDataText: View {
 private extension String {
     var stillContainsEnglishWords: Bool {
         range(of: #"[A-Za-z]{3,}"#, options: .regularExpression) != nil
+    }
+
+    var containsCareBridgeJapaneseText: Bool {
+        range(of: #"\p{Hiragana}|\p{Katakana}"#, options: .regularExpression) != nil
+    }
+
+    var containsCareBridgeThaiText: Bool {
+        range(of: #"\p{Thai}"#, options: .regularExpression) != nil
     }
 }

@@ -19,6 +19,9 @@ struct HomeView: View {
     private var recipientDisplayName: String {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return appLanguage.text(en: "Care Recipient", zhTW: "被照護者") }
+        if appLanguage.isJapanese {
+            return name.containsCareBridgeCJKText ? appLanguage.text(en: "Care Recipient", zhTW: "被照護者") : name
+        }
         return appLanguage.isChinese ? name : (name.containsCareBridgeCJKText ? "Care Recipient" : name)
     }
 

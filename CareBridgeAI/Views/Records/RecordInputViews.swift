@@ -295,7 +295,7 @@ struct TextRecordInputView: View {
         try? await Task.sleep(for: .milliseconds(450))
         guard !Task.isCancelled else { return }
 
-        let analysis = await CareAIService.analyze(trimmed)
+        let analysis = await CareAIService.analyze(trimmed, language: appLanguage)
         guard !Task.isCancelled else { return }
         selectedCategories = Set(analysis.categories)
         inferredCondition = analysis.condition
@@ -306,7 +306,7 @@ struct TextRecordInputView: View {
 
     private func saveRecords() {
         Task {
-            let analysis = await CareAIService.analyze(inputText)
+            let analysis = await CareAIService.analyze(inputText, language: appLanguage)
             let categories = selectedCategories.isEmpty ? analysis.categories : Array(selectedCategories)
             var newRecords = CareAIService.generateRecordsFromText(
                 inputText,
@@ -487,7 +487,7 @@ struct VoiceRecordInputView: View {
                     )
                         .font(.headline)
 
-                    Text(appLanguage.text(en: "Recognizing with \(recordingLanguage.englishName). Speech is converted to text first, then AI classifies it into one or more care records.", zhTW: "使用\(recordingLanguage.displayName)辨識。語音會先轉成文字，再由 AI 分類成一筆或多筆照護紀錄。"))
+                    Text(appLanguage.text(en: "Recognizing with \(recordingLanguage.displayName(in: appLanguage)). Speech is converted to text first, then AI classifies it into one or more care records.", zhTW: "使用\(recordingLanguage.displayName)辨識。語音會先轉成文字，再由 AI 分類成一筆或多筆照護紀錄。"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -630,7 +630,7 @@ struct VoiceRecordInputView: View {
         guard !transcript.isEmpty else { return }
 
         Task {
-            let analysis = await CareAIService.analyze(transcript)
+            let analysis = await CareAIService.analyze(transcript, language: recordingLanguage)
             let newRecords = CareAIService.generateRecordsFromText(
                 transcript,
                 selectedCategories: analysis.categories,
@@ -655,7 +655,7 @@ struct VoiceRecordInputView: View {
         try? await Task.sleep(for: .milliseconds(450))
         guard !Task.isCancelled else { return }
 
-        let analysis = await CareAIService.analyze(transcript)
+        let analysis = await CareAIService.analyze(transcript, language: recordingLanguage)
         guard !Task.isCancelled else { return }
         predictedCategories = analysis.categories
         predictedSuggestions = analysis.suggestions

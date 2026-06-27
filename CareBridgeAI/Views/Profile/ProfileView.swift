@@ -175,6 +175,9 @@ struct ProfileView: View {
         guard !name.isEmpty else {
             return appLanguage.text(en: "Care Recipient", zhTW: "被照護者")
         }
+        if appLanguage.isJapanese {
+            return name.containsCareBridgeCJKText ? appLanguage.text(en: "Care Recipient", zhTW: "被照護者") : name
+        }
         return appLanguage.isChinese ? name : name.careBridgeEnglishDisplayValue
     }
 
@@ -395,7 +398,7 @@ struct ProfileView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(draft.carePreference.isEmpty ? appLanguage.text(en: "No special notes yet", zhTW: "目前沒有特殊備註") : draft.carePreference.localizedCareText(appLanguage))
+                LocalizedDataText(text: draft.carePreference.isEmpty ? appLanguage.text(en: "No special notes yet", zhTW: "目前沒有特殊備註") : draft.carePreference)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .lineSpacing(3)

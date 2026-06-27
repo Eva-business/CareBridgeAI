@@ -139,6 +139,107 @@ extension String {
         }
     }
 
+    var careBridgeJapaneseProfileValue: String {
+        switch careBridgeEnglishProfileValue {
+        case "Main Manager":
+            return "主管理者"
+        case "Female":
+            return "女性"
+        case "Male":
+            return "男性"
+        case "Other":
+            return "その他"
+        case "Mother":
+            return "母"
+        case "Father":
+            return "父"
+        case "Grandmother":
+            return "祖母"
+        case "Grandfather":
+            return "祖父"
+        case "Spouse":
+            return "配偶者"
+        case "Family":
+            return "家族"
+        case "Caregiver":
+            return "介護者"
+        case "Self":
+            return "本人"
+        case "Unknown":
+            return "不明"
+        default:
+            return self
+        }
+    }
+
+    func careBridgeLocalizedProfileValue(_ language: AppLanguage) -> String {
+        let translations: [AppLanguage: [String: String]] = [
+            .id: [
+                "Main Manager": "Pengelola utama",
+                "Female": "Perempuan",
+                "Male": "Laki-laki",
+                "Other": "Lainnya",
+                "Mother": "Ibu",
+                "Father": "Ayah",
+                "Grandmother": "Nenek",
+                "Grandfather": "Kakek",
+                "Spouse": "Pasangan",
+                "Family": "Keluarga",
+                "Caregiver": "Perawat",
+                "Self": "Diri sendiri",
+                "Unknown": "Tidak diketahui"
+            ],
+            .vi: [
+                "Main Manager": "Người quản lý chính",
+                "Female": "Nữ",
+                "Male": "Nam",
+                "Other": "Khác",
+                "Mother": "Mẹ",
+                "Father": "Cha",
+                "Grandmother": "Bà",
+                "Grandfather": "Ông",
+                "Spouse": "Vợ/chồng",
+                "Family": "Gia đình",
+                "Caregiver": "Người chăm sóc",
+                "Self": "Bản thân",
+                "Unknown": "Không rõ"
+            ],
+            .th: [
+                "Main Manager": "ผู้จัดการหลัก",
+                "Female": "หญิง",
+                "Male": "ชาย",
+                "Other": "อื่น ๆ",
+                "Mother": "แม่",
+                "Father": "พ่อ",
+                "Grandmother": "ย่า/ยาย",
+                "Grandfather": "ปู่/ตา",
+                "Spouse": "คู่สมรส",
+                "Family": "ครอบครัว",
+                "Caregiver": "ผู้ดูแล",
+                "Self": "ตนเอง",
+                "Unknown": "ไม่ทราบ"
+            ],
+            .ja: [
+                "Main Manager": "主管理者",
+                "Female": "女性",
+                "Male": "男性",
+                "Other": "その他",
+                "Mother": "母",
+                "Father": "父",
+                "Grandmother": "祖母",
+                "Grandfather": "祖父",
+                "Spouse": "配偶者",
+                "Family": "家族",
+                "Caregiver": "介護者",
+                "Self": "本人",
+                "Unknown": "不明"
+            ]
+        ]
+
+        let english = careBridgeEnglishProfileValue
+        return translations[language]?[english] ?? english
+    }
+
     var careBridgeEnglishCareTextValue: String {
         let exactTranslations: [String: String] = [
             "主要管理者": "Main Manager",
@@ -208,7 +309,114 @@ extension String {
         return translated.containsCareBridgeCJKText ? "Care Task" : translated
     }
 
+    var careBridgeJapaneseCareDisplayValue: String {
+        let english = careBridgeEnglishCareDisplayValue
+        if containsCareBridgeCJKText, english == "Care detail recorded." {
+            return self
+        }
+
+        let translations: [String: String] = [
+            "Care detail recorded.": "ケア詳細が記録されました。",
+            "Care Recipient": "被介護者",
+            "Caregiver": "介護者",
+            "Main Manager": "主管理者",
+            "Morning Caregiver": "早番介護者",
+            "Day Caregiver": "日中介護者",
+            "Family Member": "家族",
+            "Take medication before breakfast": "朝食前に服薬",
+            "Amlodipine 5 mg for blood pressure": "血圧のための Amlodipine 5 mg",
+            "Measure blood pressure": "血圧測定",
+            "Blood pressure record": "血圧記録",
+            "Drink water after lunch": "昼食後の水分補給",
+            "Remind to drink warm water": "白湯を飲むよう促す",
+            "Bedtime rehab exercises": "就寝前のリハビリ運動",
+            "Joint mobility exercises": "関節可動域運動",
+            "Follow-up: Cardiology": "循環器内科の再診",
+            "Health clinic / Dr. Chang": "健診クリニック / 張医師",
+            "Rehab session": "リハビリ",
+            "Physical therapy center": "理学療法センター",
+            "Leg cramps happen easily at night. Remember massage and warm compress before bed.": "夜に足がつりやすいです。就寝前にマッサージと温罨法を忘れないでください。",
+            "Follow-up visit next Tuesday. Bring insurance card and current medication list.": "来週火曜日に再診です。保険証と現在の薬剤リストを持参してください。",
+            "Ate half a bowl of congee for breakfast. Appetite was fair.": "朝食にお粥を半碗食べました。食欲は普通です。",
+            "Ate half a bowl of congee for breakfast. Water intake was normal.": "朝食にお粥を半碗食べました。水分摂取は通常どおりです。",
+            "Bowel movement was normal at 08:00 today.": "本日08:00の排便は正常でした。",
+            "Mood was stable. Walked for 20 minutes this morning.": "気分は安定していました。午前中に20分散歩しました。",
+            "Medication was taken on time with no abnormal reaction.": "予定どおり服薬し、異常反応はありませんでした。",
+            "Grandma had a steamed bun and a cup of soy milk for breakfast today.": "祖母は今日の朝食に饅頭1個と豆乳1杯を摂りました。",
+            "Mood quick check: current status is Good. Grandma was in a good mood this morning.": "気分のクイック確認：現在の状態は良好です。祖母は今朝機嫌が良かったです。",
+            "Mood quick check: current status is Good.": "気分のクイック確認：現在の状態は良好です。",
+            "Breakfast: finished oatmeal, banana slices, and 250 ml of warm water. Appetite was slightly lower than usual but no choking was observed.": "朝食：オートミール、バナナスライス、白湯250 mlを完食。食欲は普段よりやや低めでしたが、むせは見られませんでした。",
+            "Blood pressure was 132/78 mmHg before morning medication. Amlodipine 5 mg was taken at 08:10 with no dizziness or nausea reported.": "朝の服薬前の血圧は132/78 mmHg。08:10にAmlodipine 5 mgを服用し、めまいや吐き気の訴えはありませんでした。",
+            "Bowel movement at 09:05. Stool was soft and formed. No abdominal pain was reported.": "09:05に排便。便は柔らかく成形されており、腹痛の訴えはありませんでした。",
+            "Mood was calm after a video call with family. Participated in light conversation and followed simple instructions well.": "家族とのビデオ通話後、気分は落ち着いていました。短い会話に参加し、簡単な指示にもよく従えました。",
+            "Lunch: ate about 70% of rice, steamed fish, and vegetables. Drank another 200 ml of water. Continue encouraging fluids in the afternoon.": "昼食：ご飯、蒸し魚、野菜を約70%摂取。さらに水を200 ml飲みました。午後も水分摂取を促してください。",
+            "Completed 15 minutes of seated leg exercises. Mild knee stiffness was noted, but pain did not increase.": "座位での脚の運動を15分実施。軽い膝のこわばりはありましたが、痛みは増えていません。",
+            "The afternoon medication was missed before the meal. Please confirm the next dose with the caregiver and avoid taking a double dose.": "午後の食前薬を飲み忘れました。次回服薬について介護者に確認し、二重服用を避けてください。",
+            "Morning blood pressure check": "朝の血圧確認",
+            "Record systolic, diastolic, and any dizziness before medication.": "服薬前に収縮期血圧、拡張期血圧、めまいの有無を記録。",
+            "Give morning medication": "朝の薬を渡す",
+            "Amlodipine 5 mg after breakfast. Confirm swallowing before leaving.": "朝食後にAmlodipine 5 mg。離れる前に飲み込んだことを確認。",
+            "Hydration reminder": "水分補給リマインダー",
+            "Offer 200 ml warm water. Use small sips if appetite is low.": "白湯200 mlを提供。食欲が低い場合は少しずつ飲んでもらう。",
+            "Seated leg exercises": "座位での脚の運動",
+            "15 minutes. Stop if knee pain increases.": "15分。膝の痛みが増える場合は中止。",
+            "Cardiology follow-up": "循環器内科の再診",
+            "Bring blood pressure log and current medication list.": "血圧記録と現在の薬剤リストを持参。",
+            "Evening medication check": "夜の服薬確認",
+            "Confirm pill box compartment is empty before bedtime.": "就寝前に薬ケースの該当区画が空であることを確認。",
+            "Prefers warm water and soft foods when appetite is low.": "食欲が低いときは白湯と柔らかい食事を好みます。",
+            "Family video calls usually improve mood in the morning.": "午前中の家族とのビデオ通話で気分が良くなることが多いです。",
+            "Check knee stiffness before starting afternoon exercises.": "午後の運動前に膝のこわばりを確認。",
+            "No complete care records have been added today. Add food, medication, bowel, or mood records and the system will create a handoff summary automatically.": "本日は完全なケア記録がまだ追加されていません。食事、服薬、排便、気分の記録を追加すると、システムが申し送り要約を自動作成します。",
+            "No care records have been added today. No clear abnormal information is available yet.": "本日はケア記録がまだ追加されていません。明確な異常情報はまだありません。",
+            "Overall status is currently stable.": "全体の状態は現在安定しています。",
+            "Overall status is stable today. Breakfast and lunch intake were normal, and mood was calm.": "本日の全体状態は安定しています。朝食と昼食の摂取は通常どおりで、気分も落ち着いていました。"
+        ]
+
+        if let translated = translations[english] {
+            return translated
+        }
+
+        var translated = english
+        let replacements: [(String, String)] = [
+            ("Food:", "食事："),
+            ("Medication:", "服薬："),
+            ("Bowel:", "排便："),
+            ("Mood:", "気分："),
+            ("Other:", "その他："),
+            ("Food quick check:", "食事のクイック確認："),
+            ("Medication quick check:", "服薬のクイック確認："),
+            ("Bowel quick check:", "排便のクイック確認："),
+            ("Mood quick check:", "気分のクイック確認："),
+            ("Other quick check:", "その他のクイック確認："),
+            ("current status is Good", "現在の状態は良好です"),
+            ("current status is Fair", "現在の状態は普通です"),
+            ("current status is Poor", "現在の状態は不調です"),
+            ("Overall status is currently stable.", "全体の状態は現在安定しています。"),
+            ("record(s) need follow-up observation today.", "件の記録は本日継続観察が必要です。"),
+            ("record(s) indicate poor condition today. Please review promptly.", "件の記録が本日不調を示しています。早めに確認してください。")
+        ]
+
+        for (source, target) in replacements {
+            translated = translated.replacingOccurrences(of: source, with: target)
+        }
+
+        return translated.containsCareBridgeCJKText ? self : translated
+    }
+
     func localizedCareText(_ language: AppLanguage) -> String {
+        if language.isJapanese {
+            return careBridgeJapaneseCareDisplayValue
+        }
+
+        if language.usesDynamicTargetTranslation {
+            let english = careBridgeEnglishCareDisplayValue
+            if containsCareBridgeCJKText, english == "Care detail recorded." {
+                return self
+            }
+            return english
+        }
+
         if language.isChinese && containsCareBridgeCJKText {
             return self
         }
@@ -310,7 +518,10 @@ extension String {
     }
 
     func localizedProfileValue(_ language: AppLanguage) -> String {
-        language.isChinese ? self : careBridgeEnglishProfileValue
+        if language.usesDynamicTargetTranslation {
+            return careBridgeLocalizedProfileValue(language)
+        }
+        return language.isChinese ? self : careBridgeEnglishProfileValue
     }
 
     func localizedTaskText(_ language: AppLanguage) -> String {
