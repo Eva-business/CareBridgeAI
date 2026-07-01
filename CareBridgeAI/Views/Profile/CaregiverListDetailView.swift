@@ -7,6 +7,10 @@ struct CaregiverListDetailView: View {
     let listType: CaregiverListType
     let mainManager: Caregiver?
     let caregivers: [Caregiver]
+    var canRemoveMembers: Bool = false
+    var onRemoveMember: ((Caregiver) -> Void)? = nil
+
+    @State private var memberPendingRemoval: Caregiver?
 
     private var sharedCaregivers: [Caregiver] {
         caregivers.filter {
@@ -41,6 +45,28 @@ struct CaregiverListDetailView: View {
                         dismiss()
                     }
                 }
+            }
+            .alert(
+                appLanguage.text(en: "Remove collaborator?", zhTW: "刪除協作人員？"),
+                isPresented: Binding(
+                    get: { memberPendingRemoval != nil },
+                    set: { if !$0 { memberPendingRemoval = nil } }
+                ),
+                presenting: memberPendingRemoval
+            ) { member in
+                Button(appLanguage.text(en: "Cancel", zhTW: "取消"), role: .cancel) {
+                    memberPendingRemoval = nil
+                }
+
+                Button(appLanguage.text(en: "Remove", zhTW: "刪除"), role: .destructive) {
+                    onRemoveMember?(member)
+                    memberPendingRemoval = nil
+                }
+            } message: { member in
+                Text(appLanguage.text(
+                    en: "\(member.name.localizedCareText(appLanguage)) will no longer be able to access this care account.",
+                    zhTW: "「\(member.name.localizedCareText(appLanguage))」將無法再存取此照護帳號。"
+                ))
             }
         }
     }
@@ -140,6 +166,24 @@ struct CaregiverListDetailView: View {
                 title: appLanguage.text(en: "Member Status", zhTW: "成員狀態"),
                 value: caregiver.status.displayName(appLanguage)
             )
+
+            if canRemoveMembers && caregiver.role != .mainManager {
+                Button(role: .destructive) {
+                    memberPendingRemoval = caregiver
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text(appLanguage.text(en: "Remove Collaborator", zhTW: "刪除協作人員"))
+                            .fontWeight(.bold)
+                    }
+                    .foregroundStyle(AppTheme.dangerRed)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(AppTheme.dangerRed.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding()
         .background(Color.white)

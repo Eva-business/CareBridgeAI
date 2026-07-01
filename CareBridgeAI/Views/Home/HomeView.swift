@@ -9,6 +9,7 @@ struct HomeView: View {
 
     let aiSummary: String
     let summaryUsesOnDeviceModel: Bool
+    let currentUserID: UUID
     @Binding var tasks: [CareTask]
     @Binding var memos: [Memo]
 
@@ -27,6 +28,10 @@ struct HomeView: View {
 
     private var displayedAISummary: String {
         aiSummary.localizedCareText(appLanguage)
+    }
+
+    private var personalMemos: [Memo] {
+        memos.filter { $0.ownerID == currentUserID }
     }
 
     private var nextTask: CareTask? {
@@ -313,12 +318,12 @@ struct HomeView: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(memos.isEmpty ? appLanguage.text(en: "No notes yet", zhTW: "尚無備忘") : appLanguage.text(en: "\(memos.count) note(s)", zhTW: "\(memos.count) 則備忘"))
+                            Text(personalMemos.isEmpty ? appLanguage.text(en: "No notes yet", zhTW: "尚無備忘") : appLanguage.text(en: "\(personalMemos.count) note(s)", zhTW: "\(personalMemos.count) 則備忘"))
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.primary)
 
-                            if let firstMemo = memos.first {
+                            if let firstMemo = personalMemos.first {
                                 LocalizedDataText(text: firstMemo.content)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -362,14 +367,14 @@ struct HomeView: View {
                             .opacity(newMemoText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
                         }
 
-                        if memos.isEmpty {
+                        if personalMemos.isEmpty {
                             Text(appLanguage.text(en: "No notes yet. Add one above.", zhTW: "目前沒有備忘，可以在上方新增。"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             VStack(spacing: 10) {
-                                ForEach(memos) { memo in
+                                ForEach(personalMemos) { memo in
                                     HStack(alignment: .top, spacing: 10) {
                                         Image(systemName: "star.fill")
                                             .foregroundStyle(AppTheme.warningYellow)
@@ -429,12 +434,12 @@ struct HomeView: View {
         let trimmed = newMemoText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        memos.insert(Memo(content: trimmed), at: 0)
+        memos.insert(Memo(ownerID: currentUserID, content: trimmed), at: 0)
         newMemoText = ""
     }
 
     private func deleteMemo(_ memo: Memo) {
-        memos.removeAll { $0.id == memo.id }
+        memos.removeAll { $0.id == memo.id && $0.ownerID == currentUserID }
     }
 }
 
@@ -484,18 +489,24 @@ struct TimelineRowView: View {
 }
 
 #Preview {
+    let userID = UUID()
+
     HomeView(
         draft: CareRecipientDraft(),
         profilePhoto: ProfilePhotoStore(),
         status: .good,
         aiSummary: "Overall status is stable today. Breakfast and lunch intake were normal, and mood was calm.",
         summaryUsesOnDeviceModel: true,
+        currentUserID: userID,
         tasks: .constant([
             CareTask(title: "Community rehab", note: "Routine task", dueDate: Date()),
             CareTask(title: "Medication after lunch", note: "Blood pressure medication", dueDate: Date().addingTimeInterval(7200))
         ]),
         memos: .constant([
-            Memo(content: "Leg cramps happen easily at night. Remember massage and warm compress before bed.")
+            Memo(
+                ownerID: userID,
+                content: "Leg cramps happen easily at night. Remember massage and warm compress before bed."
+            )
         ])
     )
 }

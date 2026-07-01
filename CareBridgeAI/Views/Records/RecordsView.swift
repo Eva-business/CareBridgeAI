@@ -22,6 +22,7 @@ struct RecordsView: View {
 
     let draft: CareRecipientDraft
     @Binding var records: [CareRecord]
+    let currentUser: Caregiver
     let recordingLanguage: AppLanguage
     let onSummaryGenerated: (CareAISummary) -> Void
 
@@ -31,15 +32,18 @@ struct RecordsView: View {
     @State private var showingAISummary = false
     @State private var isGeneratingSummary = false
     @State private var generatedSummary: CareAISummary?
+    @State private var recordPendingDeletion: CareRecord?
 
     init(
         draft: CareRecipientDraft,
         records: Binding<[CareRecord]>,
+        currentUser: Caregiver,
         recordingLanguage: AppLanguage = .zhTW,
         onSummaryGenerated: @escaping (CareAISummary) -> Void = { _ in }
     ) {
         self.draft = draft
         _records = records
+        self.currentUser = currentUser
         self.recordingLanguage = recordingLanguage
         self.onSummaryGenerated = onSummaryGenerated
     }
@@ -151,6 +155,28 @@ struct RecordsView: View {
             }
             .onChange(of: selectedDate) {
                 generatedSummary = nil
+            }
+            .alert(
+                appLanguage.text(en: "Delete Record?", zhTW: "刪除紀錄？"),
+                isPresented: Binding(
+                    get: { recordPendingDeletion != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            recordPendingDeletion = nil
+                        }
+                    }
+                ),
+                presenting: recordPendingDeletion
+            ) { record in
+                Button(appLanguage.text(en: "Delete", zhTW: "刪除"), role: .destructive) {
+                    deleteRecord(record)
+                }
+
+                Button(appLanguage.text(en: "Cancel", zhTW: "取消"), role: .cancel) {
+                    recordPendingDeletion = nil
+                }
+            } message: { _ in
+                Text(appLanguage.text(en: "Only the person who created this record can delete it.", zhTW: "只有建立這筆紀錄的人可以刪除。"))
             }
         }
     }
@@ -309,7 +335,26 @@ struct RecordsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
             } else {
                 ForEach(filteredRecords) { record in
-                    CareRecordRowView(record: record)
+                    ZStack(alignment: .topTrailing) {
+                        CareRecordRowView(record: record)
+
+                        if canDeleteRecord(record) {
+                            Button(role: .destructive) {
+                                recordPendingDeletion = record
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(AppTheme.dangerRed)
+                                    .frame(width: 34, height: 34)
+                                    .background(AppTheme.dangerRed.opacity(0.10))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 10)
+                            .padding(.trailing, 10)
+                        }
+                    }
                 }
             }
         }
@@ -402,9 +447,29 @@ struct RecordsView: View {
             components.minute = timeComponents.minute
             components.second = timeComponents.second
             datedRecord.createdAt = calendar.date(from: components) ?? selectedDate
+            datedRecord.createdBy = currentUser.name
+            datedRecord.createdByID = currentUser.id
             return datedRecord
         }
         records.insert(contentsOf: datedRecords, at: 0)
+    }
+
+    private func canDeleteRecord(_ record: CareRecord) -> Bool {
+        if let createdByID = record.createdByID {
+            return createdByID == currentUser.id
+        }
+
+        return record.createdBy == currentUser.name
+    }
+
+    private func deleteRecord(_ record: CareRecord) {
+        guard canDeleteRecord(record) else {
+            recordPendingDeletion = nil
+            return
+        }
+
+        records.removeAll { $0.id == record.id }
+        recordPendingDeletion = nil
     }
 }
 
@@ -417,6 +482,15 @@ struct RecordsView: View {
                 category: .food,
                 condition: .good
             )
-        ])
+        ]),
+        currentUser: Caregiver(
+            name: "Main Manager",
+            phone: "0912345678",
+            email: "manager@example.com",
+            password: "12345678",
+            role: .mainManager,
+            status: .approved,
+            isCreator: true
+        )
     )
 }

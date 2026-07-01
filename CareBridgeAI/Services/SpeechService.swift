@@ -13,6 +13,8 @@ final class SpeechService: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var speechRecognizer: SFSpeechRecognizer?
+    private var accumulatedTranscript: String = ""
+    private var currentRecordingTranscript: String = ""
 
     func requestPermission() {
         SFSpeechRecognizer.requestAuthorization { status in
@@ -33,7 +35,9 @@ final class SpeechService: ObservableObject {
     func startRecording(language: AppLanguage) {
         stopRecording()
 
-        transcript = ""
+        accumulatedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentRecordingTranscript = ""
+        transcript = accumulatedTranscript
         errorMessage = nil
 
         speechRecognizer = SFSpeechRecognizer(
@@ -64,7 +68,11 @@ final class SpeechService: ObservableObject {
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { result, error in
                 Task { @MainActor in
                     if let result {
-                        self.transcript = result.bestTranscription.formattedString
+                        self.currentRecordingTranscript = result.bestTranscription.formattedString
+                        self.transcript = self.joinedTranscript(
+                            self.accumulatedTranscript,
+                            self.currentRecordingTranscript
+                        )
                     }
 
                     if let error {
@@ -110,8 +118,21 @@ final class SpeechService: ObservableObject {
         recognitionTask?.cancel()
         recognitionTask = nil
 
+        accumulatedTranscript = joinedTranscript(accumulatedTranscript, currentRecordingTranscript)
+        currentRecordingTranscript = ""
+        transcript = accumulatedTranscript
         isRecording = false
 
         try? AVAudioSession.sharedInstance().setActive(false)
+    }
+
+    private func joinedTranscript(_ previous: String, _ current: String) -> String {
+        let previous = previous.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = current.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !previous.isEmpty else { return current }
+        guard !current.isEmpty else { return previous }
+
+        return "\(previous) \(current)"
     }
 }

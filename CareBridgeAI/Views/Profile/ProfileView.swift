@@ -227,7 +227,9 @@ struct ProfileView: View {
                 CaregiverListDetailView(
                     listType: listType,
                     mainManager: manager,
-                    caregivers: approvedMembers
+                    caregivers: approvedMembers,
+                    canRemoveMembers: isMainManager,
+                    onRemoveMember: removeMember
                 )
             }
             .onChange(of: selectedPhotoItem) {
@@ -550,6 +552,16 @@ struct ProfileView: View {
 
     private func rejectMember(_ member: Caregiver) {
         accountStore.rejectRequest(
+            member,
+            careRecipientID: draft.careRecipientID
+        )
+    }
+
+    private func removeMember(_ member: Caregiver) {
+        guard isMainManager, member.role != .mainManager else { return }
+
+        draft.caregivers.removeAll { $0.id == member.id }
+        accountStore.removeMember(
             member,
             careRecipientID: draft.careRecipientID
         )

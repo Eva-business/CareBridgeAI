@@ -246,7 +246,7 @@ struct AddTaskView: View {
 
         let days = sortedDays
             .map { $0.fullName(appLanguage) }
-            .joined(separator: appLanguage.isChinese ? "、" : ", ")
+            .joined(separator: (appLanguage.isChinese || appLanguage.isJapanese) ? "、" : ", ")
         return appLanguage.text(en: "Will remind on \(days)", zhTW: "將於\(days)提醒")
     }
 

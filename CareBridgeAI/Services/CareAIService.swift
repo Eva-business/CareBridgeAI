@@ -40,8 +40,10 @@ private struct GeneratedCareAnalysis {
 @available(iOS 26.0, *)
 @Generable
 private struct GeneratedCareRecord {
+    @Guide(description: "Choose exactly one category. Use medicine for medication, pills, blood pressure, blood sugar, doctor, clinic, or follow-up visits even if the text says after breakfast.")
     var category: GeneratedCareCategory
 
+    @Guide(description: "Choose exactly one label: good = 良好, completed as expected, stable, or explicitly no symptoms; normal = 普通, mild unnegated concern needing observation; bad = 不好, urgent or clearly abnormal.")
     var condition: GeneratedCareCondition
 
     @Guide(description: "A short factual record for only this category, written in the requested output language")
@@ -59,7 +61,7 @@ private enum GeneratedCareCategory {
 }
 
 @available(iOS 26.0, *)
-@Generable
+@Generable(description: "The care condition label. good = 良好/completed/stable/no symptoms; normal = 普通/mild unnegated concern; bad = 不好/urgent or clearly abnormal.")
 private enum GeneratedCareCondition {
     case good
     case normal
@@ -86,28 +88,22 @@ private enum GeneratedCareStatus {
 
 enum CareAIService {
     static func analyze(_ text: String, language: AppLanguage = .en) async -> CareAIAnalysis {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
         guard !trimmed.isEmpty else {
             return CareAIAnalysis(categories: [], condition: nil, suggestions: [], usedOnDeviceModel: false)
         }
 
+        var analyzers: [CareSemanticAnalyzing] = []
+
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *), SystemLanguageModel.default.availability == .available {
-            do {
-                return try await analyzeWithFoundationModels(trimmed, language: language)
-            } catch {
-                // The deterministic fallback keeps recording available if the model refuses or is busy.
-            }
+            analyzers.append(FoundationModelsCareSemanticAnalyzer())
         }
         #endif
 
-        let categories = classifyCategories(trimmed)
-        let condition = inferCondition(from: trimmed)
-        return CareAIAnalysis(
-            categories: categories,
-            condition: condition,
-            suggestions: buildFallbackSuggestions(from: trimmed, categories: categories, condition: condition, language: language),
-            usedOnDeviceModel: false
+        analyzers.append(KeywordFallbackCareSemanticAnalyzer())
+        return await CareSemanticAnalyzerPipeline(analyzers: analyzers).analyze(
+            CareSemanticAnalysisRequest(text: trimmed, outputLanguage: language)
         )
     }
 
@@ -160,30 +156,15 @@ enum CareAIService {
     }
 
     static func classifyCategories(_ text: String) -> [CareRecordCategory] {
-        var categories: [CareRecordCategory] = []
-
-        let foodKeywords = ["吃", "飯", "早餐", "午餐", "晚餐", "喝水", "食慾", "牛奶", "水果", "進食", "粥"]
-        let medicineKeywords = ["藥", "服藥", "用藥", "血壓", "血糖", "回診", "醫生", "藥物", "健保卡", "忘記吃藥", "漏吃藥"]
-        let bowelKeywords = ["排便", "大便", "小便", "便秘", "腹瀉", "尿", "廁所"]
-        let moodKeywords = ["情緒", "開心", "難過", "焦慮", "生氣", "失眠", "睡", "哭", "笑", "平穩"]
-
-        if foodKeywords.contains(where: { text.contains($0) }) { categories.append(.food) }
-        if medicineKeywords.contains(where: { text.contains($0) }) { categories.append(.medicine) }
-        if bowelKeywords.contains(where: { text.contains($0) }) { categories.append(.bowel) }
-        if moodKeywords.contains(where: { text.contains($0) }) { categories.append(.mood) }
-
-        return categories.isEmpty ? [.custom] : categories
+        KeywordFallbackCareSemanticAnalyzer.classifyCategories(
+            KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
+        )
     }
 
     static func inferCondition(from text: String) -> RecordCondition? {
-        let badKeywords = ["不好", "發燒", "跌倒", "嘔吐", "呼吸困難", "胸痛", "昏倒", "劇痛", "無法進食", "意識不清", "忘記", "漏吃", "沒吃藥", "未服藥"]
-        let normalKeywords = ["普通", "還好", "尚可", "咳嗽", "食慾差", "頭暈", "疲倦", "便秘", "腹瀉", "不舒服"]
-        let goodKeywords = ["正常", "良好", "穩定", "有吃", "按時", "平穩", "開心", "不錯", "精神好", "精神還不錯"]
-
-        if badKeywords.contains(where: { text.contains($0) }) { return .bad }
-        if normalKeywords.contains(where: { text.contains($0) }) { return .normal }
-        if goodKeywords.contains(where: { text.contains($0) }) { return .good }
-        return nil
+        KeywordFallbackCareSemanticAnalyzer.inferCondition(
+            from: KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
+        )
     }
 
     static func generateRecordsFromText(
@@ -192,7 +173,7 @@ enum CareAIService {
         analysis: CareAIAnalysis? = nil,
         condition: RecordCondition? = nil
     ) -> [CareRecord] {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
         guard !trimmed.isEmpty else { return [] }
 
         let categories = uniqueCategories(selectedCategories.isEmpty ? (analysis?.categories ?? classifyCategories(trimmed)) : selectedCategories)
@@ -204,7 +185,7 @@ enum CareAIService {
             condition: resolvedCondition
         )
 
-        return suggestions.map {
+        return finalizedRecordSuggestions(suggestions).map {
             CareRecord(content: $0.content, category: $0.category, condition: $0.condition)
         }
     }
@@ -263,7 +244,7 @@ enum CareAIService {
         for category in CareRecordCategory.allCases {
             if let latest = sortedRecords.first(where: { $0.category == category }) {
                 let content = latest.content.localizedCareText(language)
-                let separator = language.isChinese ? "：" : ": "
+                let separator = (language.isChinese || language.isJapanese) ? "：" : ": "
                 parts.append("\(category.displayName(language))\(separator)\(content)")
             }
         }
@@ -319,25 +300,15 @@ enum CareAIService {
         analysis: CareAIAnalysis? = nil,
         condition: RecordCondition? = nil
     ) -> [CareAIRecordSuggestion] {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
         guard !trimmed.isEmpty else { return [] }
 
-        let selectedCategories = uniqueCategories(categories.isEmpty ? classifyCategories(trimmed) : categories)
-        let analyzedSuggestions = analysis?.suggestions ?? []
-
-        return selectedCategories.map { category in
-            if let suggestion = analyzedSuggestions.first(where: { $0.category == category }) {
-                return suggestion
-            }
-
-            let content = extractContent(for: category, from: trimmed)
-            let resolvedCondition = inferCondition(from: content) ?? (selectedCategories.count == 1 ? condition : nil) ?? .normal
-            return CareAIRecordSuggestion(
-                category: category,
-                condition: resolvedCondition,
-                content: content
-            )
-        }
+        return KeywordFallbackCareSemanticAnalyzer.buildRecordSuggestions(
+            from: trimmed,
+            categories: categories,
+            analysis: analysis,
+            condition: condition
+        )
     }
 
     private static func buildFallbackSuggestions(
@@ -346,14 +317,12 @@ enum CareAIService {
         condition: RecordCondition?,
         language: AppLanguage = .en
     ) -> [CareAIRecordSuggestion] {
-        buildRecordSuggestions(from: text, categories: categories, condition: condition).map { suggestion in
-            guard language.usesDynamicTargetTranslation else { return suggestion }
-            return CareAIRecordSuggestion(
-                category: suggestion.category,
-                condition: suggestion.condition,
-                content: suggestion.content.localizedCareText(language)
-            )
-        }
+        KeywordFallbackCareSemanticAnalyzer.buildSuggestions(
+            from: text,
+            categories: categories,
+            condition: condition,
+            outputLanguage: language
+        )
     }
 
     private static func uniqueCategories(_ categories: [CareRecordCategory]) -> [CareRecordCategory] {
@@ -361,134 +330,267 @@ enum CareAIService {
         return categories.filter { seen.insert($0).inserted }
     }
 
-    private static func extractContent(for category: CareRecordCategory, from text: String) -> String {
-        let clauses = splitClauses(text)
-        let matchedClauses = clauses.filter {
-            let primaryCategory = primaryCategory(for: $0)
-            if primaryCategory == category {
-                return true
-            }
-            if category == .mood, clauseContains($0, category: .mood) {
-                return true
-            }
-            return primaryCategory == nil && clauseContains($0, category: category)
+    private static func finalizedRecordSuggestions(
+        _ suggestions: [CareAIRecordSuggestion]
+    ) -> [CareAIRecordSuggestion] {
+        let scopedSuggestions: [CareAIRecordSuggestion] = suggestions.compactMap { suggestion in
+            let scopedContent = finalCategoryContent(
+                for: suggestion.category,
+                in: suggestion.content
+            )
+            guard !scopedContent.isEmpty else { return nil }
+
+            return CareAIRecordSuggestion(
+                category: suggestion.category,
+                condition: finalCondition(
+                    current: suggestion.condition,
+                    content: scopedContent
+                ),
+                content: scopedContent
+            )
         }
 
-        let content = matchedClauses
-            .map { focusedClause($0, for: category) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "，")
-
-        return content.isEmpty ? text : content
-    }
-
-    private static func splitClauses(_ text: String) -> [String] {
-        var normalized = text
-        ["但是", "可是", "不過", "而且", "另外", "然後", "並且"].forEach {
-            normalized = normalized.replacingOccurrences(of: $0, with: "，")
+        let containsMedicine = scopedSuggestions.contains { $0.category == .medicine }
+        let filtered = scopedSuggestions.filter { suggestion in
+            !(containsMedicine && suggestion.category == .food && !finalContainsFoodIntakeEvidence(in: suggestion.content))
         }
 
-        return normalized
-            .split { "，,。；;\n".contains($0) }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        return filtered.reduce(into: [CareAIRecordSuggestion]()) { result, suggestion in
+            guard let index = result.firstIndex(where: { $0.category == suggestion.category }) else {
+                result.append(suggestion)
+                return
+            }
+
+            if suggestion.content.count > result[index].content.count {
+                result[index] = suggestion
+            }
+        }
     }
 
-    private static func clauseContains(_ clause: String, category: CareRecordCategory) -> Bool {
-        categoryKeywords(for: category).contains { clause.contains($0) }
-    }
+    private static func finalCategoryContent(
+        for category: CareRecordCategory,
+        in text: String
+    ) -> String {
+        let trimmed = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
 
-    private static func primaryCategory(for clause: String) -> CareRecordCategory? {
-        if clauseContains(clause, category: .medicine) { return .medicine }
-        if clauseContains(clause, category: .bowel) { return .bowel }
-        if clauseContains(clause, category: .food) { return .food }
-        if clauseContains(clause, category: .mood) { return .mood }
-        return nil
-    }
-
-    private static func focusedClause(_ clause: String, for category: CareRecordCategory) -> String {
         switch category {
         case .food:
-            return prefixBeforeFirstKeyword(in: clause, keywords: categoryKeywords(for: .mood)) ?? clause
+            return finalTrimmedRecordContent(
+                finalPrefixBeforeFirstKeyword(in: trimmed, keywords: finalMedicationBoundaryKeywords + finalMedicineKeywords + finalBowelKeywords + finalMoodKeywords) ?? trimmed
+            )
+        case .medicine:
+            return finalTrimmedRecordContent(
+                finalSegment(from: finalMedicineKeywords, until: finalBowelKeywords + finalMoodKeywords, in: trimmed) ?? trimmed
+            )
+        case .bowel:
+            return finalTrimmedRecordContent(
+                finalSegment(from: finalBowelKeywords, until: finalMedicineKeywords + finalMoodKeywords, in: trimmed) ?? trimmed
+            )
         case .mood:
-            return suffixFromFirstKeyword(in: clause, keywords: categoryKeywords(for: .mood)) ?? clause
-        case .medicine, .bowel, .custom:
-            return clause
+            return finalTrimmedRecordContent(
+                finalSegment(from: finalMoodKeywords, until: finalMedicineKeywords + finalBowelKeywords, in: trimmed) ?? trimmed
+            )
+        case .custom:
+            return finalTrimmedRecordContent(trimmed)
         }
     }
 
-    private static func prefixBeforeFirstKeyword(in text: String, keywords: [String]) -> String? {
-        guard let range = firstKeywordRange(in: text, keywords: keywords), range.lowerBound > text.startIndex else {
+    private static func finalCondition(
+        current: RecordCondition,
+        content: String
+    ) -> RecordCondition {
+        guard let inferred = KeywordFallbackCareSemanticAnalyzer.inferCondition(from: content, language: .zhTW) else {
+            return current
+        }
+
+        if current == .normal, inferred == .good {
+            return .good
+        }
+
+        return finalConditionSeverity(inferred) > finalConditionSeverity(current) ? inferred : current
+    }
+
+    private static func finalSegment(
+        from startKeywords: [String],
+        until boundaryKeywords: [String],
+        in text: String
+    ) -> String? {
+        guard let startRange = finalFirstKeywordRange(in: text, keywords: startKeywords) else {
             return nil
         }
-        return String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let segmentStart = startRange.lowerBound
+        let searchRange = startRange.upperBound..<text.endIndex
+        let boundaryRange = boundaryKeywords
+            .compactMap { keyword in
+                text.range(
+                    of: keyword,
+                    options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                    range: searchRange
+                )
+            }
+            .sorted { $0.lowerBound < $1.lowerBound }
+            .first
+
+        let segmentEnd = boundaryRange?.lowerBound ?? text.endIndex
+        let content = String(text[segmentStart..<segmentEnd])
+        return content.isEmpty ? nil : content
     }
 
-    private static func suffixFromFirstKeyword(in text: String, keywords: [String]) -> String? {
-        guard let range = firstKeywordRange(in: text, keywords: keywords) else {
+    private static func finalTrimmedRecordContent(_ text: String) -> String {
+        text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "，,。；;、")))
+    }
+
+    private static func finalConditionSeverity(_ condition: RecordCondition) -> Int {
+        switch condition {
+        case .good:
+            return 0
+        case .normal:
+            return 1
+        case .bad:
+            return 2
+        }
+    }
+
+    private static func finalPrefixBeforeFirstKeyword(in text: String, keywords: [String]) -> String? {
+        guard let range = finalFirstKeywordRange(in: text, keywords: keywords),
+              range.lowerBound > text.startIndex
+        else {
             return nil
         }
-        return String(text[range.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let content = String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
     }
 
-    private static func firstKeywordRange(in text: String, keywords: [String]) -> Range<String.Index>? {
+    private static func finalSuffixFromFirstKeyword(in text: String, keywords: [String]) -> String? {
+        guard let range = finalFirstKeywordRange(in: text, keywords: keywords) else {
+            return nil
+        }
+
+        let content = String(text[range.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
+    }
+
+    private static func finalFirstKeywordRange(in text: String, keywords: [String]) -> Range<String.Index>? {
         keywords
-            .compactMap { text.range(of: $0) }
+            .compactMap { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) }
             .sorted { $0.lowerBound < $1.lowerBound }
             .first
     }
 
-    private static func categoryKeywords(for category: CareRecordCategory) -> [String] {
-        switch category {
-        case .food:
-            return ["吃", "飯", "早餐", "午餐", "晚餐", "喝水", "食慾", "牛奶", "水果", "進食", "粥"]
-        case .medicine:
-            return ["藥", "服藥", "用藥", "血壓", "血糖", "回診", "醫生", "藥物", "健保卡", "忘記吃藥", "漏吃藥", "未服藥"]
-        case .bowel:
-            return ["排便", "大便", "小便", "便秘", "腹瀉", "尿", "廁所"]
-        case .mood:
-            return ["情緒", "開心", "難過", "焦慮", "生氣", "失眠", "睡", "哭", "笑", "平穩", "精神", "不錯"]
-        case .custom:
-            return []
+    private static func finalContainsFoodIntakeEvidence(in text: String) -> Bool {
+        let normalized = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
+        if finalFoodIntakeKeywords.contains(where: { keyword in
+            normalized.range(of: keyword, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) != nil
+        }) {
+            return true
         }
+
+        return finalNonMedicationEatingRange(in: normalized) != nil
     }
+
+    private static func finalNonMedicationEatingRange(in text: String) -> Range<String.Index>? {
+        let medicationTerms = ["藥", "藥物", "medicine", "medication", "meds", "pill"]
+        var searchRange = text.startIndex..<text.endIndex
+
+        while let range = text.range(
+            of: "吃",
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            range: searchRange
+        ) {
+            let suffixEnd = text.index(range.upperBound, offsetBy: 4, limitedBy: text.endIndex) ?? text.endIndex
+            let suffix = String(text[range.upperBound..<suffixEnd])
+            if !medicationTerms.contains(where: { suffix.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) != nil }) {
+                return range
+            }
+
+            guard range.upperBound < text.endIndex else { break }
+            searchRange = range.upperBound..<text.endIndex
+        }
+
+        return nil
+    }
+
+    private static let finalFoodIntakeKeywords = [
+        "喝", "進食", "食慾", "完食", "幾口", "半碗", "一碗", "水", "牛奶", "水果", "粥",
+        "ate", "drank", "drink", "appetite", "finished", "meal", "water", "milk", "fruit", "porridge"
+    ]
+
+    private static let finalMedicineKeywords = [
+        "早餐後已服用", "午餐後已服用", "晚餐後已服用", "飯後已服用", "早餐後", "午餐後", "晚餐後", "飯後",
+        "餐後已服用", "餐後", "已服用", "服用", "服藥後", "藥", "服藥", "用藥", "血壓", "血糖", "回診", "醫生", "藥物",
+        "medicine", "medication", "meds", "pill", "dose", "blood pressure", "blood sugar"
+    ]
+
+    private static let finalMedicationBoundaryKeywords = [
+        "早餐後已服用", "午餐後已服用", "晚餐後已服用", "飯後已服用", "餐後已服用",
+        "早餐後以服用", "午餐後以服用", "晚餐後以服用", "飯後以服用", "餐後以服用",
+        "早餐後", "午餐後", "晚餐後", "飯後", "餐後"
+    ]
+
+    private static let finalBowelKeywords = [
+        "排便", "大便", "便秘", "腹瀉", "廁所", "解便", "stool", "bowel", "constipation", "diarrhea"
+    ]
+
+    private static let finalMoodKeywords = [
+        "情緒", "心情", "精神", "焦慮", "開心", "沮喪", "疲倦", "mood", "calm", "anxious", "happy", "sad"
+    ]
 }
 
 #if canImport(FoundationModels)
 @available(iOS 26.0, *)
 private extension CareAIService {
+    struct FoundationModelsCareSemanticAnalyzer: CareSemanticAnalyzing {
+        let engineName = "Foundation Models"
+
+        func analyze(_ request: CareSemanticAnalysisRequest) async throws -> CareAIAnalysis {
+            try await CareAIService.analyzeWithFoundationModels(
+                request.text,
+                language: request.outputLanguage
+            )
+        }
+    }
+
     static func analyzeWithFoundationModels(_ text: String, language: AppLanguage) async throws -> CareAIAnalysis {
+        let normalizedText = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
         let outputLanguage = language.foundationModelOutputLanguageName
         let session = LanguageModelSession(instructions: """
             You classify caregiver notes. Extract every relevant category, even when one note contains multiple events.
             Use custom only when none of food, medicine, bowel, or mood applies.
-            Infer condition only from explicit evidence. bad means urgent or clearly abnormal; normal means mild concern; good means explicitly stable.
+            Infer condition only from explicit evidence. bad means urgent or clearly abnormal; normal means mild concern; good means explicitly stable, completed as expected, or explicitly without symptoms.
+            Treat negated symptoms such as "no dizziness", "no nausea", "沒有嗆咳", or "無頭暈" as reassuring evidence, not as mild concern.
+            Completed meals, hydration, and medication taken as scheduled should be good unless the note also contains an unnegated concern.
             Also split the note into separate concise records in \(outputLanguage). Each record must contain only the facts for its category and have its own condition.
             Always write generated record content only in \(outputLanguage), regardless of the input language.
             """)
         let response = try await session.respond(
-            to: text,
+            to: normalizedText,
             generating: GeneratedCareAnalysis.self
         )
 
-        let generatedSuggestions = response.content.records.map {
-            CareAIRecordSuggestion(
-                category: $0.category.careRecordCategory,
-                condition: $0.condition.recordCondition,
-                content: $0.content.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        }
+        let generatedSuggestions = normalizedGeneratedSuggestions(
+            response.content.records.map {
+                CareAIRecordSuggestion(
+                    category: $0.category.careRecordCategory,
+                    condition: $0.condition.recordCondition,
+                    content: $0.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            },
+            language: language
+        )
         let categories = uniqueCategories(response.content.categories.map(\.careRecordCategory) + generatedSuggestions.map(\.category))
         let fallbackSuggestions = buildFallbackSuggestions(
-            from: text,
+            from: normalizedText,
             categories: categories,
             condition: response.content.condition?.recordCondition,
             language: language
         )
         let suggestions = categories.map { category in
-            generatedSuggestions.first(where: { $0.category == category && !$0.content.isEmpty })
-            ?? fallbackSuggestions.first(where: { $0.category == category })
-            ?? CareAIRecordSuggestion(category: category, condition: .normal, content: text)
+            preferredSuggestion(
+                generated: generatedSuggestions.first(where: { $0.category == category && !$0.content.isEmpty }),
+                fallback: fallbackSuggestions.first(where: { $0.category == category })
+            ) ?? CareAIRecordSuggestion(category: category, condition: .normal, content: normalizedText)
         }
 
         return CareAIAnalysis(
@@ -497,6 +599,226 @@ private extension CareAIService {
             suggestions: suggestions,
             usedOnDeviceModel: true
         )
+    }
+
+    static func normalizedGeneratedSuggestions(
+        _ suggestions: [CareAIRecordSuggestion],
+        language: AppLanguage
+    ) -> [CareAIRecordSuggestion] {
+        let normalized: [CareAIRecordSuggestion] = suggestions.compactMap { suggestion in
+            let content = suggestion.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !content.isEmpty else { return nil }
+
+            let classifiedCategories = KeywordFallbackCareSemanticAnalyzer.classifyCategories(content, language: language)
+            let category = classifiedCategories.count > 1 && classifiedCategories.contains(suggestion.category)
+                ? suggestion.category
+                : (dominantCategory(for: content, language: language) ?? suggestion.category)
+            let scopedContent = categorySpecificContent(for: category, in: content)
+            let condition = correctedCondition(
+                suggestion.condition,
+                content: scopedContent,
+                language: language
+            )
+
+            return CareAIRecordSuggestion(
+                category: category,
+                condition: condition,
+                content: scopedContent
+            )
+        }
+
+        let containsMedicine = normalized.contains { $0.category == .medicine }
+        let filtered = normalized.filter { suggestion in
+            !(containsMedicine && suggestion.category == .food && !containsFoodIntakeEvidence(in: suggestion.content))
+        }
+
+        return deduplicatedSuggestions(filtered)
+    }
+
+    static func preferredSuggestion(
+        generated: CareAIRecordSuggestion?,
+        fallback: CareAIRecordSuggestion?
+    ) -> CareAIRecordSuggestion? {
+        guard let generated else { return fallback }
+        guard let fallback else { return generated }
+
+        let generatedContent = generated.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackContent = fallback.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !fallbackContent.isEmpty else { return generated }
+        guard !generatedContent.isEmpty else { return fallback }
+
+        if fallbackContent.count > generatedContent.count {
+            return CareAIRecordSuggestion(
+                category: generated.category,
+                condition: conditionSeverity(fallback.condition) > conditionSeverity(generated.condition) ? fallback.condition : generated.condition,
+                content: fallbackContent
+            )
+        }
+
+        return generated
+    }
+
+    static func dominantCategory(for text: String, language: AppLanguage) -> CareRecordCategory? {
+        let categories = KeywordFallbackCareSemanticAnalyzer.classifyCategories(text, language: language)
+        if categories.contains(.medicine) { return .medicine }
+        if categories.contains(.bowel) { return .bowel }
+        if categories.contains(.food) { return .food }
+        if categories.contains(.mood) { return .mood }
+        return categories.first == .custom ? nil : categories.first
+    }
+
+    static func deduplicatedSuggestions(_ suggestions: [CareAIRecordSuggestion]) -> [CareAIRecordSuggestion] {
+        suggestions.reduce(into: [CareAIRecordSuggestion]()) { result, suggestion in
+            guard let index = result.firstIndex(where: { $0.category == suggestion.category }) else {
+                result.append(suggestion)
+                return
+            }
+
+            if suggestion.content.count > result[index].content.count {
+                result[index] = suggestion
+            }
+        }
+    }
+
+    static func categorySpecificContent(
+        for category: CareRecordCategory,
+        in text: String
+    ) -> String {
+        let trimmed = KeywordFallbackCareSemanticAnalyzer.normalizedCareSpeechText(text)
+        switch category {
+        case .food:
+            return trimmedRecordContent(prefixBeforeFirstKeyword(in: trimmed, keywords: medicationBoundaryKeywords + medicineKeywords + bowelKeywords + moodKeywords) ?? trimmed)
+        case .medicine:
+            return trimmedRecordContent(segment(from: medicineKeywords, until: bowelKeywords + moodKeywords, in: trimmed) ?? trimmed)
+        case .bowel:
+            return trimmedRecordContent(segment(from: bowelKeywords, until: medicineKeywords + moodKeywords, in: trimmed) ?? trimmed)
+        case .mood:
+            return trimmedRecordContent(segment(from: moodKeywords, until: medicineKeywords + bowelKeywords, in: trimmed) ?? trimmed)
+        case .custom:
+            return trimmedRecordContent(trimmed)
+        }
+    }
+
+    static func prefixBeforeFirstKeyword(in text: String, keywords: [String]) -> String? {
+        guard let range = firstKeywordRange(in: text, keywords: keywords),
+              range.lowerBound > text.startIndex
+        else {
+            return nil
+        }
+
+        let content = String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
+    }
+
+    static func suffixFromFirstKeyword(in text: String, keywords: [String]) -> String? {
+        guard let range = firstKeywordRange(in: text, keywords: keywords) else {
+            return nil
+        }
+
+        let content = String(text[range.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
+    }
+
+    static func segment(
+        from startKeywords: [String],
+        until boundaryKeywords: [String],
+        in text: String
+    ) -> String? {
+        guard let startRange = firstKeywordRange(in: text, keywords: startKeywords) else {
+            return nil
+        }
+
+        let searchRange = startRange.upperBound..<text.endIndex
+        let boundaryRange = boundaryKeywords
+            .compactMap { keyword in
+                text.range(
+                    of: keyword,
+                    options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                    range: searchRange
+                )
+            }
+            .sorted { $0.lowerBound < $1.lowerBound }
+            .first
+
+        let segmentEnd = boundaryRange?.lowerBound ?? text.endIndex
+        let content = String(text[startRange.lowerBound..<segmentEnd])
+        return content.isEmpty ? nil : content
+    }
+
+    static func trimmedRecordContent(_ text: String) -> String {
+        text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "，,。；;、")))
+    }
+
+    static func firstKeywordRange(in text: String, keywords: [String]) -> Range<String.Index>? {
+        keywords
+            .compactMap { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) }
+            .sorted { $0.lowerBound < $1.lowerBound }
+            .first
+    }
+
+    static let medicineKeywords = [
+        "早餐後已服用", "午餐後已服用", "晚餐後已服用", "飯後已服用", "餐後已服用",
+        "早餐後", "午餐後", "晚餐後", "飯後", "餐後",
+        "已服用", "服用", "服藥後", "藥", "服藥", "用藥", "血壓", "血糖", "回診", "醫生", "藥物",
+        "medicine", "medication", "meds", "pill", "dose", "blood pressure", "blood sugar"
+    ]
+
+    static let medicationBoundaryKeywords = [
+        "早餐後已服用", "午餐後已服用", "晚餐後已服用", "飯後已服用", "餐後已服用",
+        "早餐後以服用", "午餐後以服用", "晚餐後以服用", "飯後以服用", "餐後以服用",
+        "早餐後", "午餐後", "晚餐後", "飯後", "餐後"
+    ]
+
+    static let bowelKeywords = [
+        "排便", "大便", "便秘", "腹瀉", "廁所", "解便", "stool", "bowel", "constipation", "diarrhea"
+    ]
+
+    static let moodKeywords = [
+        "情緒", "心情", "精神", "焦慮", "開心", "沮喪", "疲倦", "mood", "calm", "anxious", "happy", "sad"
+    ]
+
+    static func containsFoodIntakeEvidence(in text: String) -> Bool {
+        let keywords = [
+            "喝", "進食", "食慾", "完食", "幾口", "半碗", "一碗", "水", "牛奶", "水果", "粥",
+            "ate", "drank", "drink", "appetite", "finished", "meal", "water", "milk", "fruit", "porridge"
+        ]
+        if keywords.contains(where: { keyword in
+            text.range(of: keyword, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) != nil
+        }) {
+            return true
+        }
+
+        return finalNonMedicationEatingRange(in: text) != nil
+    }
+
+    static func correctedCondition(
+        _ condition: RecordCondition,
+        content: String,
+        language: AppLanguage
+    ) -> RecordCondition {
+        guard let fallbackCondition = KeywordFallbackCareSemanticAnalyzer.inferCondition(
+            from: content,
+            language: language
+        ) else {
+            return condition
+        }
+
+        if condition == .normal, fallbackCondition == .good {
+            return .good
+        }
+
+        return conditionSeverity(fallbackCondition) > conditionSeverity(condition) ? fallbackCondition : condition
+    }
+
+    static func conditionSeverity(_ condition: RecordCondition) -> Int {
+        switch condition {
+        case .good:
+            return 0
+        case .normal:
+            return 1
+        case .bad:
+            return 2
+        }
     }
 
     static func summarizeWithFoundationModels(

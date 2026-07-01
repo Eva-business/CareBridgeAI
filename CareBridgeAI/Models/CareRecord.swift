@@ -157,6 +157,7 @@ struct CareRecord: Identifiable, Codable {
     var condition: RecordCondition?
     var createdAt: Date
     var createdBy: String
+    var createdByID: UUID?
     var attachments: [CareRecordAttachment]
 
     init(
@@ -166,6 +167,7 @@ struct CareRecord: Identifiable, Codable {
         condition: RecordCondition? = nil,
         createdAt: Date = Date(),
         createdBy: String = "Main Manager",
+        createdByID: UUID? = nil,
         attachments: [CareRecordAttachment] = []
     ) {
         self.id = id
@@ -174,6 +176,7 @@ struct CareRecord: Identifiable, Codable {
         self.condition = condition
         self.createdAt = createdAt
         self.createdBy = createdBy
+        self.createdByID = createdByID
         self.attachments = attachments
     }
 
@@ -184,6 +187,7 @@ struct CareRecord: Identifiable, Codable {
         case condition
         case createdAt
         case createdBy
+        case createdByID
         case attachments
     }
 
@@ -195,6 +199,7 @@ struct CareRecord: Identifiable, Codable {
         condition = try container.decodeIfPresent(RecordCondition.self, forKey: .condition)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         createdBy = try container.decode(String.self, forKey: .createdBy)
+        createdByID = try container.decodeIfPresent(UUID.self, forKey: .createdByID)
         attachments = try container.decodeIfPresent([CareRecordAttachment].self, forKey: .attachments) ?? []
     }
 }

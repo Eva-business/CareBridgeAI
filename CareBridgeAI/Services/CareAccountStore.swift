@@ -191,6 +191,26 @@ final class CareAccountStore: ObservableObject {
 
         persistAccountState()
     }
+
+    func removeMember(
+        _ caregiver: Caregiver,
+        careRecipientID: String
+    ) {
+        let normalizedID = careRecipientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let emailKey = caregiver.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard caregiver.role != .mainManager else { return }
+
+        if var draft = careAccountsByID[normalizedID] {
+            draft.caregivers.removeAll { $0.id == caregiver.id }
+            careAccountsByID[normalizedID] = draft
+        }
+
+        usersByEmail.removeValue(forKey: emailKey)
+        pendingRequestsByAccountID[normalizedID]?.removeAll { $0.id == caregiver.id }
+
+        persistAccountState()
+    }
     
     func chatMessages(for careRecipientID: String) -> [ChatMessage] {
         let normalizedID = careRecipientID.trimmingCharacters(in: .whitespacesAndNewlines)

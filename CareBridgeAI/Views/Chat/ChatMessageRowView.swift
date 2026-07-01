@@ -78,7 +78,8 @@ struct ChatMessageRowView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                    if let translatedText = message.translatedText,
+                    if !isMine,
+                       let translatedText = message.translatedText,
                        let translatedLanguage = message.translatedLanguage {
                         Divider()
 
